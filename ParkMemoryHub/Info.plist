@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Bundle Identifier -->
+    <key>CFBundleIdentifier</key>
+    <string>lxr.ParkMemoryHub</string>
+    
+    <!-- Bundle Name -->
+    <key>CFBundleName</key>
+    <string>ParkMemoryHub</string>
+    
+    <!-- Bundle Display Name -->
+    <key>CFBundleDisplayName</key>
+    <string>ParkMemory Hub</string>
+    
+    <!-- Bundle Version -->
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    
+    <!-- Bundle Short Version -->
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    
+    <!-- Bundle Package Type -->
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    
+    <!-- Bundle Executable -->
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    
+    <!-- Bundle Info Dictionary Version -->
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    
+    <!-- Background Modes -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+        <string>remote-notification</string>
+        <string>background-processing</string>
+    </array>
+    
+    <!-- Background Task Scheduler Identifiers -->
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>com.parkmemoryhub.locationSync</string>
+    </array>
+    
+    <!-- Location Usage Descriptions -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>ParkMemory Hub needs access to your location to show your position on the family radar and help family members find each other in the park.</string>
+    
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>ParkMemory Hub needs access to your location to provide real-time family tracking and location-based features even when the app is in the background.</string>
+    
+    <!-- Camera Usage Description -->
+    <key>NSCameraUsageDescription</key>
+    <string>ParkMemory Hub needs access to your camera to capture photos and videos of your park memories.</string>
+    
+    <!-- Photo Library Usage Description -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>ParkMemory Hub needs access to your photo library to save and share your park memories.</string>
+    
+    <!-- Microphone Usage Description -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>ParkMemory Hub needs access to your microphone to record videos with sound.</string>
+    
+    <!-- AR Usage Description -->
+    <key>NSCameraUsageDescription</key>
+    <string>ParkMemory Hub needs access to your camera for augmented reality features to visualize family members in 3D space.</string>
+    
+    <!-- Network Security -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>firebaseapp.com</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+            </dict>
+            <key>googleapis.com</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+            </dict>
+        </dict>
+    </dict>
+    
+    <!-- App Permissions -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arkit</string>
+        <string>gps</string>
+        <string>location-services</string>
+    </array>
+    
+    <!-- Supported Interface Orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <!-- Launch Screen -->
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string>AccentColor</string>
+        <key>UIImageName</key>
+        <string></string>
+    </dict>
+
+    <!-- Application requires full screen -->
+    <key>UIRequiresFullScreen</key>
+    <false/>
+    
+    <!-- Status Bar Style -->
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleDefault</string>
+    
+    <!-- View Controller Based Status Bar Appearance -->
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <true/>
+</dict>
+</plist>
