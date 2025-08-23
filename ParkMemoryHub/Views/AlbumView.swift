@@ -136,7 +136,7 @@ struct AlbumView: View {
                 .presentationCornerRadius(Theme.cornerRadiusL)
         }
         .fullScreenCover(isPresented: $showInstantCamera) {
-            InstantCameraView()
+            InstantCameraView(autoSaveToMemories: false)
         }
     }
     

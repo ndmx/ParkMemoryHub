@@ -232,8 +232,15 @@ struct ProfilePictureEditorView: View {
                 let filename = "profile_\(user.uid)_\(UUID().uuidString).jpg"
                 let storageRef = Storage.storage().reference().child("profiles/\(filename)")
                 
+                print("🔄 Uploading profile picture to: profiles/\(filename)")
+                print("📤 User ID: \(user.uid)")
+                print("📦 Image data size: \(imageData.count) bytes")
+                
                 _ = try await storageRef.putDataAsync(imageData)
+                print("✅ Profile picture uploaded successfully")
+                
                 let downloadURL = try await storageRef.downloadURL()
+                print("🔗 Download URL: \(downloadURL.absoluteString)")
                 
                 // Update user profile with new avatar URL
                 try await firebaseService.updateUserProfile(userId: user.uid, updates: [
@@ -256,6 +263,9 @@ struct ProfilePictureEditorView: View {
                     }
                 }
             } catch {
+                print("❌ Profile picture upload failed: \(error)")
+                print("❌ Error details: \(error.localizedDescription)")
+                
                 DispatchQueue.main.async {
                     self.isProcessing = false
                     self.alertMessage = "Failed to save profile picture: \(error.localizedDescription)"

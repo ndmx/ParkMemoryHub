@@ -14,13 +14,36 @@ struct InstantCameraView: View {
     @State private var showLibrary = false
     @State private var capturedImage: UIImage?
     @State private var showCapturedImageView = false
-    @State private var autoSaveToMemories = true // Default to auto-save
+    @State private var autoSaveToMemories: Bool
+    @State private var showToast = false
+    @State private var toastMessage = ""
+    
+    // Add initializer to control auto-save behavior
+    init(autoSaveToMemories: Bool = true) {
+        self._autoSaveToMemories = State(initialValue: autoSaveToMemories)
+    }
     
     var body: some View {
         NavigationStack {
             ZStack {
                 cameraPreviewView
                 overlayContent
+                
+                // Toast notification
+                if showToast {
+                    VStack {
+                        Spacer()
+                        Text(toastMessage)
+                            .font(.body)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.black.opacity(0.8))
+                            .cornerRadius(10)
+                            .padding(.bottom, 200)
+                        Spacer()
+                    }
+                    .transition(.opacity)
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -36,7 +59,9 @@ struct InstantCameraView: View {
         .animation(.snappy(duration: 0.3), value: isDepthEnabled)
         .animation(.snappy(duration: 0.3), value: isAutoMode)
         .sheet(isPresented: $showLibrary) {
-            PhotoPickerView()
+            PhotoPickerView { selectedImage in
+                handleCapturedPhoto(selectedImage)
+            }
         }
         .sheet(isPresented: $showFilters) {
             Text("Camera Filters")
@@ -52,6 +77,7 @@ struct InstantCameraView: View {
     }
     
     private func handleCapturedPhoto(_ image: UIImage) {
+        print("🖼️ Image captured, size: \(image.size)")
         capturedImage = image
         
         if autoSaveToMemories {
@@ -59,36 +85,58 @@ struct InstantCameraView: View {
             autoSavePhoto(image)
         } else {
             // Show preview for manual upload
-            showCapturedImageView = true
+            DispatchQueue.main.async {
+                self.showCapturedImageView = true
+            }
         }
     }
     
     private func autoSavePhoto(_ image: UIImage) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else { 
+            print("❌ Failed to convert image to JPEG data")
+            return 
+        }
+        
+        print("📤 Auto-saving photo to Firebase...")
         
         Task {
             do {
-                let _ = try await FirebaseService.shared.uploadMedia(
+                let mediaId = try await FirebaseService.shared.uploadMedia(
                     imageData,
                     userId: FirebaseService.shared.currentUser?.uid ?? "",
-                    username: "Unknown", // TODO: Get from user profile
-                    caption: nil, // No caption for auto-save
+                    username: "Camera User", // TODO: Get from user profile
+                    caption: "Auto-saved from camera",
                     location: nil,
-                    tags: [],
+                    tags: ["camera"],
                     appliedFilter: nil,
                     frameTheme: nil
                 )
                 
                 await MainActor.run {
                     HapticManager.shared.success()
-                    print("✅ Photo auto-saved to memories!")
+                    print("✅ Photo auto-saved to memories! ID: \(mediaId)")
+                    showToastMessage("📸 Photo saved to memories!")
                 }
                 
             } catch {
                 await MainActor.run {
                     HapticManager.shared.error()
                     print("❌ Failed to auto-save photo: \(error.localizedDescription)")
+                    showToastMessage("❌ Failed to save photo")
                 }
+            }
+        }
+    }
+    
+    private func showToastMessage(_ message: String) {
+        toastMessage = message
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showToast = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showToast = false
             }
         }
     }
@@ -125,20 +173,17 @@ extension InstantCameraView {
     }
     
     private var overlayContent: some View {
-        GeometryReader { geometry in
-            VStack {
-                Spacer()
-                
-                // Text positioned at 30% from bottom
-                overlayStamps
-                    .padding(.bottom, geometry.size.height * 0.3)
-                
-                Spacer()
-                
-                // Tabs positioned at 20% from bottom  
-                bottomCarousel
-                    .padding(.bottom, geometry.size.height * 0.2)
-            }
+        VStack {
+            Spacer()
+            
+            // Text overlays positioned higher up
+            overlayStamps
+                .padding(.bottom, 200)
+            
+            Spacer()
+            
+            // Tabs always at the bottom
+            bottomCarousel
         }
     }
     
@@ -179,14 +224,20 @@ extension InstantCameraView {
     }
     
     private var bottomCarousel: some View {
-        HStack(spacing: 8) {
-            libraryButton
-            depthButton
+        VStack(spacing: 20) {
+            // Main circular capture button
             captureButton
-            autoModeButton
-            effectsButton
+            
+            // Other tabs in horizontal row at the very bottom
+            HStack(spacing: 12) {
+                libraryButton
+                depthButton
+                autoModeButton
+                effectsButton
+            }
+            .padding(.horizontal, 40)
         }
-        .padding(.horizontal, 40)
+        .padding(.bottom, 30) // Stick to bottom with safe area
     }
     
     private var libraryButton: some View {
@@ -285,29 +336,21 @@ extension InstantCameraView {
         }
     }
     
-        private var captureButton: some View {
+    private var captureButton: some View {
         Button(action: {
             HapticManager.shared.cameraShutter()
             Task {
                 await cameraManager.capturePhoto()
             }
         }) {
-            VStack(spacing: 4) {
-                Image(systemName: "camera.fill")
-                    .font(.title2)
-                Text("Capture")
-                    .font(.caption)
-            }
-            .foregroundStyle(.white)
-            .frame(width: 70, height: 60)
-            .background {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.red.gradient)
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(.white.opacity(0.3), lineWidth: 1)
-            )
+            Circle()
+                .stroke(.white, lineWidth: 4)
+                .frame(width: 80, height: 80)
+                .background(
+                    Circle()
+                        .fill(.clear)
+                        .frame(width: 72, height: 72)
+                )
         }
     }
     
@@ -579,6 +622,11 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
 // MARK: - Photo Picker View
 struct PhotoPickerView: UIViewControllerRepresentable {
     @Environment(\.dismiss) private var dismiss
+    let onImageSelected: (UIImage) -> Void
+    
+    init(onImageSelected: @escaping (UIImage) -> Void = { _ in }) {
+        self.onImageSelected = onImageSelected
+    }
     
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
@@ -604,8 +652,7 @@ struct PhotoPickerView: UIViewControllerRepresentable {
             if let image = info[.originalImage] as? UIImage {
                 print("📷 Photo selected from library: \(image.size)")
                 HapticManager.shared.success()
-                // TODO: Implement proper library photo handling
-                // Could pass image to parent view for upload
+                parent.onImageSelected(image)
             }
             parent.dismiss()
         }

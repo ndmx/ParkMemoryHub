@@ -19,7 +19,7 @@ struct RadarView: View {
     @State private var showPingAlert = false
     @State private var pingMessage = ""
     @State private var isLoading = false
-    @State private var showARView = false
+
     @State private var engine: CHHapticEngine?
     @State private var isVisible = false
     @State private var memberLocations: [String: CLLocationCoordinate2D] = [:]
@@ -36,18 +36,6 @@ struct RadarView: View {
             Spacer()
 
             HStack(spacing: Theme.spacingS) {
-                Button(action: { showARView = true }) {
-                    Image(systemName: "arkit")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Theme.accentColor)
-                        .clipShape(Circle())
-                        .themeShadow(.small)
-                }
-                .accessibilityLabel("Open AR Family Radar")
-                .accessibilityHint("View family members in augmented reality")
-
                 Button(action: refreshLocations) {
                     Image(systemName: "arrow.clockwise")
                         .font(.title2)
@@ -251,9 +239,7 @@ struct RadarView: View {
                 centerOnUserLocation()
             }
         }
-        .sheet(isPresented: $showARView) {
-            ARRadarView(familyMembers: familyMembers)
-        }
+
     }
     
     private func centerOnUserLocation() {
