@@ -22,9 +22,16 @@ struct AlbumView: View {
                         .font(.title2)
                         .foregroundColor(.white)
                         .frame(width: 44, height: 44)
-                        .background(Color.blue)
-                        .clipShape(Circle())
-                        .shadow(radius: 3)
+                        .background {
+                            if #available(iOS 18.0, *) {
+                                Theme.accentMeshGradient
+                                    .clipShape(Circle())
+                            } else {
+                                Circle()
+                                    .fill(Theme.primaryColor)
+                            }
+                        }
+                        .themeShadow(.medium)
                 }
             }
             .padding()

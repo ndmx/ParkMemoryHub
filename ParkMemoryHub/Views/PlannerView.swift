@@ -20,9 +20,20 @@ struct PlannerView: View {
                 Spacer()
                 
                 Button(action: { showNewActivitySheet = true }) {
-                    Image(systemName: "plus.circle.fill")
+                    Image(systemName: "plus")
                         .font(.title2)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background {
+                            if #available(iOS 18.0, *) {
+                                Theme.accentMeshGradient
+                                    .clipShape(Circle())
+                            } else {
+                                Circle()
+                                    .fill(Theme.primaryColor)
+                            }
+                        }
+                        .themeShadow(.medium)
                 }
             }
             .padding()

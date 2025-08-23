@@ -65,10 +65,47 @@ struct Theme {
     static let animationSlow = Animation.easeInOut(duration: 0.5)
     static let springAnimation = Animation.spring(response: 0.3, dampingFraction: 0.6)
     
+    // MARK: - iOS 18 Enhanced Animations
+    @available(iOS 18.0, *)
+    static let snappyAnimation = Animation.snappy(duration: 0.3)
+    @available(iOS 18.0, *)
+    static let smoothAnimation = Animation.smooth(duration: 0.4)
+    
     // MARK: - Glassmorphism
     static let glassmorphism = Material.ultraThinMaterial
     static let glassmorphismThin = Material.thinMaterial
     static let glassmorphismThick = Material.thickMaterial
+    
+    // MARK: - iOS 18 Mesh Gradients
+    @available(iOS 18.0, *)
+    static let primaryMeshGradient = MeshGradient(
+        width: 3,
+        height: 3,
+        points: [
+            [0.0, 0.0], [0.5, 0.0], [1.0, 0.0],
+            [0.0, 0.5], [0.5, 0.5], [1.0, 0.5],
+            [0.0, 1.0], [0.5, 1.0], [1.0, 1.0]
+        ],
+        colors: [
+            primaryColor, accentColor, secondaryColor,
+            accentColor, primaryColor, accentColor,
+            secondaryColor, accentColor, primaryColor
+        ]
+    )
+    
+    @available(iOS 18.0, *)
+    static let accentMeshGradient = MeshGradient(
+        width: 2,
+        height: 2,
+        points: [
+            [0.0, 0.0], [1.0, 0.0],
+            [0.0, 1.0], [1.0, 1.0]
+        ],
+        colors: [
+            accentColor, primaryColor,
+            primaryColor.opacity(0.8), accentColor.opacity(0.8)
+        ]
+    )
 }
 
 struct Shadow {
@@ -126,6 +163,26 @@ extension View {
             shadow = Theme.shadowLarge
         }
         return self.shadow(shadow)
+    }
+    
+    // MARK: - iOS 18 Enhancements
+    @available(iOS 18.0, *)
+    func meshBackground() -> some View {
+        self.background(Theme.primaryMeshGradient)
+    }
+    
+    @available(iOS 18.0, *)
+    func accentMeshBackground() -> some View {
+        self.background(Theme.accentMeshGradient)
+    }
+    
+    @available(iOS 18.0, *)
+    func snappyAnimation() -> some View {
+        self.animation(Theme.snappyAnimation, value: UUID())
+    }
+    
+    func zoomTransition() -> some View {
+        self.transition(.scale.combined(with: .opacity))
     }
 }
 
