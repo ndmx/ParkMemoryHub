@@ -129,8 +129,8 @@ struct ProfilePictureEditorView: View {
         .sheet(isPresented: $showImagePicker) {
             ProfileImagePicker(selectedImage: $selectedImage)
         }
-        .onChange(of: selectedImage) { image in
-            if let image = image {
+        .onChange(of: selectedImage) { oldValue, newValue in
+            if let image = newValue {
                 processImageForFaceDetection(image)
             }
         }
