@@ -85,7 +85,7 @@ struct PlannerView: View {
                     
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(activities) { activity in
+                            ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
                                 ActivityCard(
                                     activity: activity,
                                     onVote: { voteType in
@@ -95,12 +95,12 @@ struct PlannerView: View {
                                         selectedActivity = activity
                                     },
                                     onDelete: {
-                                        deleteActivity(activity)
+                                        deleteActivityAtIndex(index)
                                     }
                                 )
-                                .swipeActions(edge: .trailing) {
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
-                                        deleteActivity(activity)
+                                        deleteActivityAtIndex(index)
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
@@ -215,6 +215,35 @@ struct PlannerView: View {
                 }
             } catch {
                 print("❌ Error deleting activity: \(error.localizedDescription)")
+                // Error haptic feedback
+                await MainActor.run {
+                    HapticManager.shared.error()
+                }
+                // Could add an alert here for user feedback
+            }
+        }
+    }
+    
+    private func deleteActivityAtIndex(_ index: Int) {
+        guard index < activities.count else { return }
+        let activity = activities[index]
+        
+        // Enhanced haptic feedback for delete action
+        HapticManager.shared.deleteConfirm()
+        
+        Task {
+            do {
+                // Delete from Firebase
+                try await firebaseService.deleteActivity(activity)
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    activities.remove(at: index)
+                    // Success haptic feedback
+                    HapticManager.shared.success()
+                }
+            } catch {
+                print("❌ Error deleting activity at index \(index): \(error.localizedDescription)")
                 // Error haptic feedback
                 await MainActor.run {
                     HapticManager.shared.error()

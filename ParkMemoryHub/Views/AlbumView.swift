@@ -87,19 +87,19 @@ struct AlbumView: View {
                     
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(mediaItems) { item in
+                            ForEach(Array(mediaItems.enumerated()), id: \.element.id) { index, item in
                                 MediaItemCard(
                                     item: item,
                                     onTap: {
                                         selectedMediaItem = item
                                     },
                                     onDelete: {
-                                        deleteMemory(item)
+                                        deleteMemoryAtIndex(index)
                                     }
                                 )
-                                .swipeActions(edge: .trailing) {
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
-                                        deleteMemory(item)
+                                        deleteMemoryAtIndex(index)
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
@@ -186,6 +186,35 @@ struct AlbumView: View {
                 }
             } catch {
                 print("❌ Error deleting memory: \(error.localizedDescription)")
+                // Error haptic feedback
+                await MainActor.run {
+                    HapticManager.shared.error()
+                }
+                // Could add an alert here for user feedback
+            }
+        }
+    }
+    
+    private func deleteMemoryAtIndex(_ index: Int) {
+        guard index < mediaItems.count else { return }
+        let mediaItem = mediaItems[index]
+        
+        // Enhanced haptic feedback for delete action
+        HapticManager.shared.deleteConfirm()
+        
+        Task {
+            do {
+                // Delete from Firebase
+                try await firebaseService.deleteMediaItem(mediaItem)
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    mediaItems.remove(at: index)
+                    // Success haptic feedback
+                    HapticManager.shared.success()
+                }
+            } catch {
+                print("❌ Error deleting memory at index \(index): \(error.localizedDescription)")
                 // Error haptic feedback
                 await MainActor.run {
                     HapticManager.shared.error()
