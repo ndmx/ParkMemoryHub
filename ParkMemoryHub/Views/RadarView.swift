@@ -247,7 +247,7 @@ struct RadarView: View {
         }
         .onChange(of: locationManager.currentLocation) { oldLocation, newLocation in
             // Auto-center when location becomes available or changes significantly
-            if let newLocation = newLocation {
+            if newLocation != nil {
                 centerOnUserLocation()
             }
         }

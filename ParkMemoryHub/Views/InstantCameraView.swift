@@ -576,10 +576,10 @@ struct PhotoPickerView: UIViewControllerRepresentable {
         
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
             if let image = info[.originalImage] as? UIImage {
-                print("📷 Photo selected from library")
+                print("📷 Photo selected from library: \(image.size)")
                 HapticManager.shared.success()
-                // Handle the selected image here
-                // You could save it or process it as needed
+                // TODO: Implement proper library photo handling
+                // Could pass image to parent view for upload
             }
             parent.dismiss()
         }
