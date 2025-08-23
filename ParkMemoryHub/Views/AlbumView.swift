@@ -5,6 +5,7 @@ struct AlbumView: View {
     @State private var mediaItems: [MediaItem] = []
     @State private var isLoading = false
     @State private var showCaptureView = false
+    @State private var showInstantCamera = false
     @State private var selectedMediaItem: MediaItem?
     
     var body: some View {
@@ -17,7 +18,10 @@ struct AlbumView: View {
                 
                 Spacer()
                 
-                Button(action: { showCaptureView = true }) {
+                Button(action: { 
+                    HapticManager.shared.lightTap()
+                    showInstantCamera = true 
+                }) {
                     Image(systemName: "camera.fill")
                         .font(.title2)
                         .foregroundColor(.white)
@@ -129,6 +133,9 @@ struct AlbumView: View {
                 .presentationBackground(.thinMaterial)
                 .presentationCornerRadius(Theme.cornerRadiusL)
         }
+        .fullScreenCover(isPresented: $showInstantCamera) {
+            InstantCameraView()
+        }
     }
     
     private func loadMediaItems() {
@@ -195,90 +202,119 @@ struct MediaItemCard: View {
     let onDelete: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 12) {
-                // Media content
+        Button(action: {
+            HapticManager.shared.lightTap()
+            onTap()
+        }) {
+            ZStack(alignment: .bottomLeading) {
+                // Media content with fixed aspect ratio for compactness
                 AsyncImage(url: URL(string: item.mediaURL)) { image in
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .aspectRatio(16/9, contentMode: .fill) // Fixed 16:9 aspect ratio
+                        .clipped()
                 } placeholder: {
                     Rectangle()
                         .fill(Color.gray.opacity(0.3))
+                        .aspectRatio(16/9, contentMode: .fit)
                         .overlay(
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle())
                         )
                 }
-                .frame(height: 200)
-                .clipped()
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusL))
                 
-                // Item details
-                VStack(alignment: .leading, spacing: 8) {
+                // Compact overlays for text information
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(item.username)
                             .font(.headline)
-                            .foregroundColor(.primary)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
                         
                         Spacer()
                         
-                        Text(item.createdAt, style: .relative)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        // Visible delete button
+                        // Delete button overlay
                         Button(action: {
+                            HapticManager.shared.deleteConfirm()
                             onDelete()
                         }) {
-                            Image(systemName: "trash")
+                            Image(systemName: "trash.fill")
                                 .font(.caption)
-                                .foregroundColor(.red)
-                                .padding(4)
+                                .foregroundStyle(.white)
+                                .frame(width: 24, height: 24)
+                                .background(.red.opacity(0.8), in: Circle())
                         }
                         .buttonStyle(.plain)
                     }
                     
+                    // Caption with line limit for compactness
                     if let caption = item.caption, !caption.isEmpty {
                         Text(caption)
-                            .font(.body)
-                            .foregroundColor(.primary)
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
                             .lineLimit(2)
                     }
                     
+                    // Single location tag (no duplicates)
                     if let location = item.location?.parkName {
-                        HStack {
-                            Image(systemName: "location.fill")
-                                .foregroundColor(.blue)
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.caption)
                             Text(location)
                                 .font(.caption)
-                                .foregroundColor(.secondary)
                         }
-                    }
-                    
-                    if !item.tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
-                                ForEach(item.tags, id: \.self) { tag in
-                                    Text(tag)
-                                        .font(.caption)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.blue.opacity(0.1))
-                                        .foregroundColor(.blue)
-                                        .cornerRadius(8)
-                                }
-                            }
-                        }
+                        .foregroundStyle(.white.opacity(0.9))
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(12)
+                .background {
+                    // Gradient overlay for text readability
+                    LinearGradient(
+                        colors: [.black.opacity(0.7), .black.opacity(0.3), .clear],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                }
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusL))
+                
+                // Firebase upload timestamp in top-right
+                VStack {
+                    HStack {
+                        Spacer()
+                        Text(formattedUploadTime())
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background {
+                                if #available(iOS 18.0, *) {
+                                    Capsule()
+                                        .fill(.ultraThinMaterial)
+                                        .opacity(0.8)
+                                } else {
+                                    Capsule()
+                                        .fill(.black.opacity(0.4))
+                                }
+                            }
+                            .padding(.top, 8)
+                            .padding(.trailing, 8)
+                    }
+                    Spacer()
+                }
             }
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusL))
+            .themeShadow(.medium)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func formattedUploadTime() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE HH:mm" // e.g., "Saturday 14:47"
+        return formatter.string(from: item.createdAt)
     }
 }
 
