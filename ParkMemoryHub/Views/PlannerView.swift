@@ -96,9 +96,17 @@ struct PlannerView: View {
             loadActivities()
         }) {
             NewActivityView()
+                .zoomTransition()
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(Theme.cornerRadiusL)
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $selectedActivity) { activity in
             ActivityDetailView(activity: activity)
+                .zoomTransition()
+                .presentationBackground(.thinMaterial)
+                .presentationCornerRadius(Theme.cornerRadiusL)
+                .presentationDragIndicator(.visible)
         }
         .onAppear {
             loadActivities()

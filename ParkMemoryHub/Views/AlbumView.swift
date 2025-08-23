@@ -94,9 +94,15 @@ struct AlbumView: View {
             loadMediaItems()
         }) {
             CaptureView()
+                .zoomTransition()
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(Theme.cornerRadiusL)
         }
         .sheet(item: $selectedMediaItem) { mediaItem in
             MediaDetailView(item: mediaItem)
+                .zoomTransition()
+                .presentationBackground(.thinMaterial)
+                .presentationCornerRadius(Theme.cornerRadiusL)
         }
     }
     

@@ -53,6 +53,7 @@ struct MainTabView: View {
             .tag(3)
         }
         .accentColor(Theme.primaryColor)
+        .animation(.snappy(duration: 0.3), value: selectedTab)
         .onAppear {
             setupTabBarAppearance()
             loadNotificationCounts()

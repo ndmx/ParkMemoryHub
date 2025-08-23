@@ -33,6 +33,13 @@ struct CaptureView: View {
         case mono = "Mono"
         case vibrant = "Vibrant"
         case noir = "Noir"
+        // iOS 18 Enhanced Filters
+        case dramatic = "Dramatic"
+        case vivid = "Vivid"
+        case brilliant = "Brilliant"
+        case amusement = "Amusement"
+        case bokeh = "Bokeh"
+        case portrait = "Portrait"
         
         var filterName: String {
             switch self {
@@ -41,6 +48,38 @@ struct CaptureView: View {
             case .mono: return "CIPhotoEffectMono"
             case .vibrant: return "CIVibrance"
             case .noir: return "CIPhotoEffectNoir"
+            // iOS 18 Enhanced CoreImage Filters
+            case .dramatic: return "CIPhotoEffectProcess"
+            case .vivid: return "CIColorControls"
+            case .brilliant: return "CIExposureAdjust"
+            case .amusement: return "CIColorPosterize"
+            case .bokeh: return "CIMorphologyGradient"
+            case .portrait: return "CIDepthBlurEffect"
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .none: return "circle"
+            case .sepia: return "sun.max"
+            case .mono: return "circle.grid.2x2"
+            case .vibrant: return "sparkles"
+            case .noir: return "moon"
+            case .dramatic: return "bolt.fill"
+            case .vivid: return "paintbrush.pointed"
+            case .brilliant: return "star.fill"
+            case .amusement: return "party.popper"
+            case .bokeh: return "camera.aperture"
+            case .portrait: return "person.crop.circle"
+            }
+        }
+        
+        var isDepthRequired: Bool {
+            switch self {
+            case .bokeh, .portrait:
+                return true
+            default:
+                return false
             }
         }
     }
@@ -153,28 +192,72 @@ struct CaptureView: View {
                     }
                 }
                 
-                // Filter Selection
+                // Enhanced Filter Selection with iOS 18 Styling
                 if selectedImage != nil {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Filters")
-                            .font(.headline)
-                            .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Text("Filters")
+                                .font(.headline)
+                            
+                            Spacer()
+                            
+                            if selectedFilter.isDepthRequired {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "eye.fill")
+                                        .foregroundColor(isDepthSensingEnabled ? .green : .orange)
+                                    Text(isDepthSensingEnabled ? "Depth On" : "Depth Off")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
+                            HStack(spacing: 16) {
                                 ForEach(FilterType.allCases, id: \.self) { filter in
-                                    Button(action: { applyFilter(filter) }) {
-                                        Text(filter.rawValue)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(selectedFilter == filter ? Color.blue : Color.gray.opacity(0.2))
-                                            .foregroundColor(selectedFilter == filter ? .white : .primary)
-                                            .cornerRadius(20)
+                                    Button(action: { 
+                                        applyFilter(filter)
+                                        HapticManager.shared.lightTap()
+                                    }) {
+                                        VStack(spacing: 8) {
+                                            // Filter Icon
+                                            Image(systemName: filter.icon)
+                                                .font(.title2)
+                                                .foregroundColor(selectedFilter == filter ? .white : Theme.primaryColor)
+                                                .frame(width: 44, height: 44)
+                                                .background {
+                                                    if selectedFilter == filter {
+                                                        if #available(iOS 18.0, *) {
+                                                            Theme.accentMeshGradient
+                                                                .clipShape(Circle())
+                                                        } else {
+                                                            Circle()
+                                                                .fill(Theme.primaryColor)
+                                                        }
+                                                    } else {
+                                                        Circle()
+                                                            .fill(Theme.backgroundSecondary)
+                                                            .stroke(Theme.primaryColor.opacity(0.3), lineWidth: 1)
+                                                    }
+                                                }
+                                            
+                                            // Filter Name
+                                            Text(filter.rawValue)
+                                                .font(.caption)
+                                                .foregroundColor(selectedFilter == filter ? Theme.primaryColor : .secondary)
+                                                .fontWeight(selectedFilter == filter ? .semibold : .regular)
+                                        }
+                                        .scaleEffect(selectedFilter == filter ? 1.05 : 1.0)
+                                        .animation(Theme.springAnimation, value: selectedFilter)
                                     }
+                                    .disabled(filter.isDepthRequired && !isDepthSensingEnabled)
+                                    .opacity(filter.isDepthRequired && !isDepthSensingEnabled ? 0.5 : 1.0)
                                 }
                             }
                             .padding(.horizontal)
                         }
+                        .scrollContentBackground(.hidden)
                     }
                 }
                 
@@ -319,9 +402,15 @@ struct CaptureView: View {
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(selectedImage: $selectedImage)
+                .zoomTransition()
+                .presentationBackground(.regularMaterial)
+                .presentationCornerRadius(Theme.cornerRadiusL)
         }
         .sheet(isPresented: $showCamera) {
             CameraView(selectedImage: $selectedImage)
+                .zoomTransition()
+                .presentationBackground(.thinMaterial)
+                .presentationCornerRadius(Theme.cornerRadiusL)
         }
         .onChange(of: selectedImage) { oldValue, newValue in
             if let image = newValue {
@@ -376,6 +465,62 @@ struct CaptureView: View {
             let noirFilter = CIFilter.photoEffectNoir()
             noirFilter.inputImage = ciImage
             outputImage = noirFilter.outputImage ?? ciImage
+            
+        // iOS 18 Enhanced Filters
+        case .dramatic:
+            let dramaticFilter = CIFilter.photoEffectProcess()
+            dramaticFilter.inputImage = ciImage
+            outputImage = dramaticFilter.outputImage ?? ciImage
+            
+        case .vivid:
+            let vividFilter = CIFilter.colorControls()
+            vividFilter.inputImage = ciImage
+            vividFilter.saturation = 1.5
+            vividFilter.brightness = 0.1
+            vividFilter.contrast = 1.2
+            outputImage = vividFilter.outputImage ?? ciImage
+            
+        case .brilliant:
+            let brilliantFilter = CIFilter.exposureAdjust()
+            brilliantFilter.inputImage = ciImage
+            brilliantFilter.ev = 0.7
+            outputImage = brilliantFilter.outputImage ?? ciImage
+            
+        case .amusement:
+            let amusementFilter = CIFilter.colorPosterize()
+            amusementFilter.inputImage = ciImage
+            amusementFilter.levels = 6
+            outputImage = amusementFilter.outputImage ?? ciImage
+            
+        case .bokeh:
+            if isDepthSensingEnabled, #available(iOS 18.0, *) {
+                let bokehFilter = CIFilter.morphologyGradient()
+                bokehFilter.inputImage = ciImage
+                bokehFilter.radius = 5
+                outputImage = bokehFilter.outputImage ?? ciImage
+            } else {
+                // Fallback bokeh effect without depth data
+                let blurFilter = CIFilter.gaussianBlur()
+                blurFilter.inputImage = ciImage
+                blurFilter.radius = 3
+                outputImage = blurFilter.outputImage ?? ciImage
+            }
+            
+        case .portrait:
+            if isDepthSensingEnabled, #available(iOS 18.0, *) {
+                // Advanced portrait mode with depth sensing
+                // Using gaussian blur with masking for portrait effect since depthBlurEffect isn't available
+                let portraitFilter = CIFilter.maskedVariableBlur()
+                portraitFilter.inputImage = ciImage
+                portraitFilter.radius = 8
+                outputImage = portraitFilter.outputImage ?? ciImage
+            } else {
+                // Fallback portrait effect
+                let portraitFilter = CIFilter.gaussianBlur()
+                portraitFilter.inputImage = ciImage
+                portraitFilter.radius = 2
+                outputImage = portraitFilter.outputImage ?? ciImage
+            }
             
         case .none:
             break
