@@ -63,22 +63,47 @@ struct AlbumView: View {
                 }
                 Spacer()
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(mediaItems) { item in
-                            MediaItemCard(item: item) {
-                                selectedMediaItem = item
-                            }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    deleteMemory(item)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                VStack(spacing: 12) {
+                    // Swipe hint for first time users
+                    if mediaItems.count > 0 {
+                        HStack {
+                            Text("💡 Swipe left on memories to delete")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.left")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal)
+                        .opacity(0.7)
+                    }
+                    
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(mediaItems) { item in
+                                MediaItemCard(
+                                    item: item,
+                                    onTap: {
+                                        selectedMediaItem = item
+                                    },
+                                    onDelete: {
+                                        deleteMemory(item)
+                                    }
+                                )
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        deleteMemory(item)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
+                        .padding()
                     }
-                    .padding()
                 }
             }
         }
@@ -167,6 +192,7 @@ struct AlbumView: View {
 struct MediaItemCard: View {
     let item: MediaItem
     let onTap: () -> Void
+    let onDelete: () -> Void
     
     var body: some View {
         Button(action: onTap) {
@@ -200,6 +226,17 @@ struct MediaItemCard: View {
                         Text(item.createdAt, style: .relative)
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        
+                        // Visible delete button
+                        Button(action: {
+                            onDelete()
+                        }) {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(4)
+                        }
+                        .buttonStyle(.plain)
                     }
                     
                     if let caption = item.caption, !caption.isEmpty {

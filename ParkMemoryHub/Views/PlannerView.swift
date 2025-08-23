@@ -65,28 +65,50 @@ struct PlannerView: View {
                 }
                 Spacer()
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(activities) { activity in
-                            ActivityCard(
-                                activity: activity,
-                                onVote: { voteType in
-                                    voteOnActivity(activity, voteType: voteType)
-                                },
-                                onTap: {
-                                    selectedActivity = activity
-                                }
-                            )
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    deleteActivity(activity)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                VStack(spacing: 12) {
+                    // Swipe hint for first time users
+                    if activities.count > 0 {
+                        HStack {
+                            Text("💡 Swipe left on activities to delete")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.left")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal)
+                        .opacity(0.7)
+                    }
+                    
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(activities) { activity in
+                                ActivityCard(
+                                    activity: activity,
+                                    onVote: { voteType in
+                                        voteOnActivity(activity, voteType: voteType)
+                                    },
+                                    onTap: {
+                                        selectedActivity = activity
+                                    },
+                                    onDelete: {
+                                        deleteActivity(activity)
+                                    }
+                                )
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        deleteActivity(activity)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
+                        .padding()
                     }
-                    .padding()
                 }
             }
         }
@@ -231,6 +253,7 @@ struct ActivityCard: View {
     let activity: Activity
     let onVote: (Activity.VoteType) -> Void
     let onTap: () -> Void
+    let onDelete: () -> Void
     
     var body: some View {
         Button(action: onTap) {
@@ -254,6 +277,17 @@ struct ActivityCard: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 4) {
+                        // Visible delete button
+                        Button(action: {
+                            onDelete()
+                        }) {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(4)
+                        }
+                        .buttonStyle(.plain)
+                        
                         Text(activity.status.rawValue.capitalized)
                             .font(.caption)
                             .fontWeight(.medium)
