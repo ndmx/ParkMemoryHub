@@ -5,7 +5,7 @@ struct UserProfile: Identifiable, Codable, Equatable {
     let id: String
     let username: String
     let email: String
-    let avatarURL: String?
+    var avatarURL: String?
     let isKidMode: Bool
     let familyCode: String
     let shareLocation: Bool

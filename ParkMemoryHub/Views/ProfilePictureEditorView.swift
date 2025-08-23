@@ -16,7 +16,8 @@ struct ProfilePictureEditorView: View {
     @State private var cropRect: CGRect = .zero
     @State private var faceDetected = false
     
-    let onProfileUpdated: () -> Void
+    let userProfile: UserProfile?
+    let onProfileUpdated: (UserProfile) -> Void
     
     var body: some View {
         NavigationStack {
@@ -204,10 +205,24 @@ struct ProfilePictureEditorView: View {
         return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
     }
     
+    private func resizeImageForAvatar(_ image: UIImage) -> UIImage {
+        let targetSize = CGSize(width: 300, height: 300) // Standard avatar size
+        
+        UIGraphicsBeginImageContextWithOptions(targetSize, false, 0.0)
+        image.draw(in: CGRect(origin: .zero, size: targetSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        return resizedImage ?? image
+    }
+    
     private func saveProfilePicture() {
         guard let image = croppedImage,
-              let user = firebaseService.currentUser,
-              let imageData = image.jpegData(compressionQuality: 0.8) else { return }
+              let user = firebaseService.currentUser else { return }
+        
+        // Resize image to standard avatar size before uploading
+        let resizedImage = resizeImageForAvatar(image)
+        guard let imageData = resizedImage.jpegData(compressionQuality: 0.8) else { return }
         
         isProcessing = true
         
@@ -229,7 +244,12 @@ struct ProfilePictureEditorView: View {
                     self.isProcessing = false
                     self.alertMessage = "Profile picture saved successfully!"
                     self.showAlert = true
-                    self.onProfileUpdated()
+                    
+                    // Create updated user profile with new avatar URL
+                    if var updatedProfile = self.userProfile {
+                        updatedProfile.avatarURL = downloadURL.absoluteString
+                        self.onProfileUpdated(updatedProfile)
+                    }
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                         self.dismiss()
@@ -286,5 +306,5 @@ struct ProfileImagePicker: UIViewControllerRepresentable {
 }
 
 #Preview {
-    ProfilePictureEditorView(onProfileUpdated: {})
+    ProfilePictureEditorView(userProfile: nil) { _ in }
 }

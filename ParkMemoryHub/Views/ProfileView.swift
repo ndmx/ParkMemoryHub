@@ -13,6 +13,7 @@ struct ProfileView: View {
     @State private var showHelpView = false
     @State private var showSupportView = false
     @State private var preferredColorScheme: ColorScheme?
+    @State private var showAvatarEditor = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,21 +47,38 @@ struct ProfileView: View {
                     VStack(spacing: 24) {
                         // Profile Header
                         VStack(spacing: 16) {
-                            AsyncImage(url: URL(string: userProfile?.avatarURL ?? "")) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Image(systemName: "person.circle.fill")
-                                    .font(.system(size: 80))
-                                    .foregroundColor(.gray)
+                            Button(action: {
+                                HapticManager.shared.lightTap()
+                                showAvatarEditor = true
+                            }) {
+                                AsyncImage(url: URL(string: userProfile?.avatarURL ?? "")) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 80))
+                                        .foregroundColor(.gray)
+                                }
+                                .frame(width: 100, height: 100)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.blue, lineWidth: 3)
+                                )
+                                .overlay(
+                                    // Camera overlay to indicate it's clickable
+                                    Circle()
+                                        .fill(.black.opacity(0.3))
+                                        .overlay(
+                                            Image(systemName: "camera.fill")
+                                                .font(.title2)
+                                                .foregroundColor(.white)
+                                        )
+                                        .opacity(0.8)
+                                )
                             }
-                            .frame(width: 100, height: 100)
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.blue, lineWidth: 3)
-                            )
+                            .buttonStyle(.plain)
 
                             VStack(spacing: 8) {
                                 Text(userProfile?.username ?? "Unknown User")
@@ -209,6 +227,12 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showSupportView) {
             ContactSupportView()
+        }
+        .sheet(isPresented: $showAvatarEditor) {
+            ProfilePictureEditorView(userProfile: userProfile) { updatedProfile in
+                userProfile = updatedProfile
+                loadUserProfile() // Refresh the profile data
+            }
         }
         .alert("Sign Out", isPresented: $showLogoutAlert) {
             Button("Cancel", role: .cancel) { }
