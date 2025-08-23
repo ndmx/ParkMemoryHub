@@ -41,14 +41,26 @@ struct InstantCameraView: View {
     }
     
     private var cameraPreviewView: some View {
-        CameraPreviewUIView(previewLayer: cameraManager.previewLayer)
-            .ignoresSafeArea()
-            .onAppear {
-                Task {
-                    await cameraManager.setupCamera()
-                    await fetchCurrentLocation()
-                }
+        Group {
+            if let previewLayer = cameraManager.previewLayer {
+                CameraPreviewUIView(previewLayer: previewLayer)
+                    .ignoresSafeArea()
+            } else {
+                // Loading state while camera initializes
+                Color.black
+                    .ignoresSafeArea()
+                    .overlay(
+                        ProgressView("Starting Camera...")
+                            .foregroundStyle(.white)
+                    )
             }
+        }
+        .onAppear {
+            Task {
+                await cameraManager.setupCamera()
+                await fetchCurrentLocation()
+            }
+        }
     }
     
     private var overlayContent: some View {
@@ -70,32 +82,22 @@ struct InstantCameraView: View {
     }
     
     private var timestampStamp: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(formattedTimestamp())
                 .font(.system(.title3, design: .rounded))
                 .fontWeight(.semibold)
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
             
             Text("Live")
                 .font(.system(.caption, design: .rounded))
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(.white.opacity(0.9))
+                .shadow(color: .black.opacity(0.8), radius: 1, x: 0, y: 0.5)
         }
-        .padding(12)
-        .background {
-            if #available(iOS 18.0, *) {
-                Theme.primaryMeshGradient
-                    .opacity(0.7)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusM))
-            } else {
-                RoundedRectangle(cornerRadius: Theme.cornerRadiusM)
-                    .fill(.ultraThinMaterial)
-            }
-        }
-        .opacity(0.9)
     }
     
     private var locationStamp: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Image(systemName: "mappin.and.ellipse")
                 .font(.system(.caption, design: .rounded))
             Text(location)
@@ -103,24 +105,12 @@ struct InstantCameraView: View {
                 .lineLimit(1)
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background {
-            if #available(iOS 18.0, *) {
-                Theme.accentMeshGradient
-                    .opacity(0.6)
-                    .clipShape(Capsule())
-            } else {
-                Capsule()
-                    .fill(.regularMaterial)
-            }
-        }
-        .opacity(0.8)
+        .shadow(color: .black.opacity(0.8), radius: 1, x: 0, y: 0.5)
     }
     
     private var bottomCarousel: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 20) {
+            HStack(spacing: 8) {
                 libraryButton
                 depthButton
                 autoModeButton
@@ -155,6 +145,10 @@ struct InstantCameraView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(.blue.gradient)
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.3), lineWidth: 1)
+            )
         }
     }
     
@@ -175,6 +169,10 @@ struct InstantCameraView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill((isDepthEnabled ? Color.green : Color.purple).gradient)
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.3), lineWidth: 1)
+            )
         }
     }
     
@@ -195,6 +193,10 @@ struct InstantCameraView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill((isAutoMode ? Color.orange : Color.gray).gradient)
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.3), lineWidth: 1)
+            )
         }
     }
     
@@ -215,6 +217,10 @@ struct InstantCameraView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(.indigo.gradient)
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.3), lineWidth: 1)
+            )
         }
     }
     
@@ -235,6 +241,10 @@ struct InstantCameraView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(.red.gradient)
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.3), lineWidth: 1)
+            )
         }
     }
     
@@ -339,7 +349,7 @@ struct InstantCameraView: View {
 // MARK: - Camera Manager
 @MainActor
 class CameraManager: ObservableObject {
-    var previewLayer: AVCaptureVideoPreviewLayer?
+    @Published var previewLayer: AVCaptureVideoPreviewLayer?
     private var captureSession: AVCaptureSession?
     private var photoOutput: AVCapturePhotoOutput?
     private var currentCamera: AVCaptureDevice?
@@ -366,12 +376,14 @@ class CameraManager: ObservableObject {
             photoOutput = output
         }
         
-        // Setup preview layer
-        let preview = AVCaptureVideoPreviewLayer(session: session)
-        preview.videoGravity = .resizeAspectFill
-        
-        captureSession = session
-        previewLayer = preview
+        // Setup preview layer on main thread
+        await MainActor.run {
+            let preview = AVCaptureVideoPreviewLayer(session: session)
+            preview.videoGravity = .resizeAspectFill
+            
+            self.captureSession = session
+            self.previewLayer = preview
+        }
         
         session.startRunning()
     }
@@ -412,23 +424,21 @@ class CameraManager: ObservableObject {
 
 // MARK: - Camera Preview UIView
 struct CameraPreviewUIView: UIViewRepresentable {
-    let previewLayer: AVCaptureVideoPreviewLayer?
+    let previewLayer: AVCaptureVideoPreviewLayer
     
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
         view.backgroundColor = .black
         
-        if let layer = previewLayer {
-            layer.frame = view.bounds
-            view.layer.addSublayer(layer)
-        }
+        previewLayer.frame = view.bounds
+        view.layer.addSublayer(previewLayer)
         
         return view
     }
     
     func updateUIView(_ uiView: UIView, context: Context) {
-        if let layer = previewLayer {
-            layer.frame = uiView.bounds
+        DispatchQueue.main.async {
+            previewLayer.frame = uiView.bounds
         }
     }
 }
