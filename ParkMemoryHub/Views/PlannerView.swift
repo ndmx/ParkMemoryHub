@@ -140,6 +140,9 @@ struct PlannerView: View {
     private func voteOnActivity(_ activity: Activity, voteType: Activity.VoteType) {
         guard firebaseService.currentUser != nil else { return }
         
+        // Haptic feedback for voting
+        HapticManager.shared.vote(isPositive: voteType == .yes)
+        
         Task {
             do {
                 try await firebaseService.updateActivityVotes(
@@ -150,16 +153,24 @@ struct PlannerView: View {
                 
                 // Reload activities to show updated votes
                 await loadActivitiesAsync()
+                
+                // Success feedback
+                await MainActor.run {
+                    HapticManager.shared.lightTap()
+                }
             } catch {
                 print("Failed to vote: \(error)")
+                // Error feedback
+                await MainActor.run {
+                    HapticManager.shared.error()
+                }
             }
         }
     }
     
     private func deleteActivity(_ activity: Activity) {
-        // Add haptic feedback for iOS 18
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        // Enhanced haptic feedback for delete action
+        HapticManager.shared.deleteConfirm()
         
         Task {
             do {
@@ -169,9 +180,15 @@ struct PlannerView: View {
                 // Update UI on main thread
                 await MainActor.run {
                     activities.removeAll { $0.id == activity.id }
+                    // Success haptic feedback
+                    HapticManager.shared.success()
                 }
             } catch {
                 print("❌ Error deleting activity: \(error.localizedDescription)")
+                // Error haptic feedback
+                await MainActor.run {
+                    HapticManager.shared.error()
+                }
                 // Could add an alert here for user feedback
             }
         }

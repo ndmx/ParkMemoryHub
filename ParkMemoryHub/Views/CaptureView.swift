@@ -2,6 +2,8 @@ import SwiftUI
 import PhotosUI
 import CoreImage
 import CoreImage.CIFilterBuiltins
+import ARKit
+import AVFoundation
 
 struct CaptureView: View {
     @Environment(\.dismiss) private var dismiss
@@ -18,6 +20,12 @@ struct CaptureView: View {
     @State private var showAlert = false
     @State private var alertMessage = ""
     @State private var locationInfo: MediaItem.LocationInfo?
+    
+    // iOS 18 Camera Enhancement States
+    @State private var isDepthSensingEnabled = false
+    @State private var depthData: AVDepthData?
+    @State private var showFloatingToolbar = true
+    @State private var cameraFlashMode: AVCaptureDevice.FlashMode = .auto
     
     enum FilterType: String, CaseIterable {
         case none = "None"
@@ -65,31 +73,82 @@ struct CaptureView: View {
                         )
                 }
                 
-                // Capture Buttons
+                // Enhanced Capture Buttons with iOS 18 Styling
                 if selectedImage == nil {
-                    HStack(spacing: 20) {
-                        Button(action: { showCamera = true }) {
-                            HStack {
-                                Image(systemName: "camera.fill")
-                                Text("Camera")
+                    VStack(spacing: 16) {
+                        // Floating Toolbar for Camera Options
+                        if showFloatingToolbar, #available(iOS 18.0, *) {
+                            HStack(spacing: 12) {
+                                Button(action: { toggleDepthSensing() }) {
+                                    Label(isDepthSensingEnabled ? "Depth On" : "Depth Off", 
+                                          systemImage: isDepthSensingEnabled ? "eye.fill" : "eye.slash")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                
+                                Button(action: { toggleFlashMode() }) {
+                                    Label(flashModeText, systemImage: flashModeIcon)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                                
+                                Button(action: { showFloatingToolbar.toggle() }) {
+                                    Image(systemName: "chevron.up")
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                            .background(.regularMaterial, in: Capsule())
+                            .shadow(radius: 4)
                         }
                         
-                        Button(action: { showImagePicker = true }) {
-                            HStack {
-                                Image(systemName: "photo.fill")
-                                Text("Library")
+                        // Main Capture Buttons
+                        HStack(spacing: 20) {
+                            Button(action: { 
+                                triggerHapticFeedback()
+                                showCamera = true 
+                            }) {
+                                HStack {
+                                    Image(systemName: "camera.fill")
+                                    Text("Camera")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background {
+                                    if #available(iOS 18.0, *) {
+                                        Theme.accentMeshGradient
+                                    } else {
+                                        Color.blue
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusM))
+                                .themeShadow(.medium)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.green)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
+                            
+                            Button(action: { 
+                                triggerHapticFeedback()
+                                showImagePicker = true 
+                            }) {
+                                HStack {
+                                    Image(systemName: "photo.fill")
+                                    Text("Library")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background {
+                                    if #available(iOS 18.0, *) {
+                                        Theme.primaryMeshGradient
+                                    } else {
+                                        Color.green
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusM))
+                                .themeShadow(.medium)
+                            }
                         }
                     }
                 }
@@ -119,17 +178,74 @@ struct CaptureView: View {
                     }
                 }
                 
-                // Caption Input
+                // Enhanced Caption Input with iOS 18.5 Features
                 if selectedImage != nil {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Caption")
-                            .font(.headline)
-                            .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Caption")
+                                .font(.headline)
+                            
+                            Spacer()
+                            
+                            // iOS 18.5 Emoji Toolbar
+                            if #available(iOS 18.0, *) {
+                                HStack(spacing: 8) {
+                                    ForEach(["😍", "🎢", "🎠", "🎡", "🎪", "🌟"], id: \.self) { emoji in
+                                        Button(action: {
+                                            caption += emoji
+                                            triggerHapticFeedback()
+                                        }) {
+                                            Text(emoji)
+                                                .font(.title2)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.regularMaterial, in: Capsule())
+                            }
+                        }
+                        .padding(.horizontal)
                         
-                        TextField("Add a caption...", text: $caption, axis: .vertical)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .lineLimit(3)
+                        // Enhanced Text Field with Dynamic Sizing
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Share your park memories...", text: $caption, axis: .vertical)
+                                .textFieldStyle(.plain)
+                                .padding()
+                                .background {
+                                    RoundedRectangle(cornerRadius: Theme.cornerRadiusM)
+                                        .fill(Theme.backgroundSecondary)
+                                        .stroke(Theme.primaryColor.opacity(0.3), lineWidth: 1)
+                                }
+                                .lineLimit(2...8)
+                                .font(.body)
+                                .animation(.easeInOut(duration: 0.2), value: caption.count)
+                                .padding(.horizontal)
+                            
+                            // Character Count and Suggestions
+                            HStack {
+                                if #available(iOS 18.0, *) {
+                                    Text("💭 Suggested: #memories #\(locationInfo?.parkName?.replacingOccurrences(of: " ", with: "").lowercased() ?? "themepark")")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .onTapGesture {
+                                            caption += " #memories"
+                                            if let park = locationInfo?.parkName?.replacingOccurrences(of: " ", with: "").lowercased() {
+                                                caption += " #\(park)"
+                                            }
+                                            triggerHapticFeedback()
+                                        }
+                                }
+                                
+                                Spacer()
+                                
+                                Text("\(caption.count)/280")
+                                    .font(.caption)
+                                    .foregroundColor(caption.count > 280 ? .red : .secondary)
+                            }
                             .padding(.horizontal)
+                        }
                     }
                 }
                 
@@ -305,6 +421,9 @@ struct CaptureView: View {
                     self.alertMessage = "Memory shared successfully!"
                     self.showAlert = true
                     
+                    // Celebrate successful share with haptic feedback
+                    HapticManager.shared.shareSuccess()
+                    
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                         self.dismiss()
                     }
@@ -317,6 +436,49 @@ struct CaptureView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - iOS 18 Camera Enhancement Functions
+    
+    private func toggleDepthSensing() {
+        triggerHapticFeedback()
+        isDepthSensingEnabled.toggle()
+    }
+    
+    private func toggleFlashMode() {
+        triggerHapticFeedback()
+        switch cameraFlashMode {
+        case .auto:
+            cameraFlashMode = .on
+        case .on:
+            cameraFlashMode = .off
+        case .off:
+            cameraFlashMode = .auto
+        @unknown default:
+            cameraFlashMode = .auto
+        }
+    }
+    
+    private var flashModeText: String {
+        switch cameraFlashMode {
+        case .auto: return "Auto"
+        case .on: return "On"
+        case .off: return "Off"
+        @unknown default: return "Auto"
+        }
+    }
+    
+    private var flashModeIcon: String {
+        switch cameraFlashMode {
+        case .auto: return "bolt.badge.automatic"
+        case .on: return "bolt.fill"
+        case .off: return "bolt.slash"
+        @unknown default: return "bolt.badge.automatic"
+        }
+    }
+    
+    private func triggerHapticFeedback() {
+        HapticManager.shared.lightTap()
     }
 }
 

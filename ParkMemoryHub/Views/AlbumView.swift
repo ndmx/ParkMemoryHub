@@ -132,9 +132,8 @@ struct AlbumView: View {
     }
     
     private func deleteMemory(_ mediaItem: MediaItem) {
-        // Add haptic feedback for iOS 18
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        // Enhanced haptic feedback for delete action
+        HapticManager.shared.deleteConfirm()
         
         Task {
             do {
@@ -144,9 +143,15 @@ struct AlbumView: View {
                 // Update UI on main thread
                 await MainActor.run {
                     mediaItems.removeAll { $0.id == mediaItem.id }
+                    // Success haptic feedback
+                    HapticManager.shared.success()
                 }
             } catch {
                 print("❌ Error deleting memory: \(error.localizedDescription)")
+                // Error haptic feedback
+                await MainActor.run {
+                    HapticManager.shared.error()
+                }
                 // Could add an alert here for user feedback
             }
         }
