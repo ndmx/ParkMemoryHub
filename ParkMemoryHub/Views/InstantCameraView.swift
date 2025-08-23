@@ -14,6 +14,7 @@ struct InstantCameraView: View {
     @State private var showLibrary = false
     @State private var capturedImage: UIImage?
     @State private var showCapturedImageView = false
+    @State private var autoSaveToMemories = true // Default to auto-save
     
     var body: some View {
         NavigationStack {
@@ -52,7 +53,44 @@ struct InstantCameraView: View {
     
     private func handleCapturedPhoto(_ image: UIImage) {
         capturedImage = image
-        showCapturedImageView = true
+        
+        if autoSaveToMemories {
+            // Auto-save to memories
+            autoSavePhoto(image)
+        } else {
+            // Show preview for manual upload
+            showCapturedImageView = true
+        }
+    }
+    
+    private func autoSavePhoto(_ image: UIImage) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
+        
+        Task {
+            do {
+                let _ = try await FirebaseService.shared.uploadMedia(
+                    imageData,
+                    userId: FirebaseService.shared.currentUser?.uid ?? "",
+                    username: "Unknown", // TODO: Get from user profile
+                    caption: nil, // No caption for auto-save
+                    location: nil,
+                    tags: [],
+                    appliedFilter: nil,
+                    frameTheme: nil
+                )
+                
+                await MainActor.run {
+                    HapticManager.shared.success()
+                    print("✅ Photo auto-saved to memories!")
+                }
+                
+            } catch {
+                await MainActor.run {
+                    HapticManager.shared.error()
+                    print("❌ Failed to auto-save photo: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 }
 
@@ -76,7 +114,7 @@ extension InstantCameraView {
         }
                     .onAppear {
                 // Set up camera manager callback
-                cameraManager.onPhotoCaptured = { [weak cameraManager] image in
+                cameraManager.onPhotoCaptured = { image in
                     self.handleCapturedPhoto(image)
                 }
                 Task {
@@ -141,33 +179,14 @@ extension InstantCameraView {
     }
     
     private var bottomCarousel: some View {
-        ZStack {
-            // Bottom tabs row
-            HStack(spacing: 8) {
-                libraryButton
-                depthButton
-                
-                // Spacer for capture button
-                Spacer()
-                    .frame(width: 80)
-                
-                autoModeButton
-                effectsButton
-            }
-            .padding(.horizontal, 40)
-            
-            // Capture button hovering above and centered
-            VStack {
-                captureButton
-                    .offset(y: -20) // Hover above the tabs
-                
-                // Icon label below capture button
-                Text("Capture")
-                    .font(.caption2)
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.8), radius: 1, x: 0, y: 0.5)
-            }
+        HStack(spacing: 8) {
+            libraryButton
+            depthButton
+            captureButton
+            autoModeButton
+            effectsButton
         }
+        .padding(.horizontal, 40)
     }
     
     private var libraryButton: some View {
@@ -221,19 +240,19 @@ extension InstantCameraView {
     private var autoModeButton: some View {
         Button(action: { 
             HapticManager.shared.lightTap()
-            isAutoMode.toggle() 
+            autoSaveToMemories.toggle() 
         }) {
             VStack(spacing: 4) {
-                Image(systemName: isAutoMode ? "bolt.circle.fill" : "bolt.circle")
+                Image(systemName: autoSaveToMemories ? "square.and.arrow.down.fill" : "eye.fill")
                     .font(.title2)
-                Text("Auto")
+                Text(autoSaveToMemories ? "Auto" : "Preview")
                     .font(.caption)
             }
             .foregroundStyle(.white)
             .frame(width: 70, height: 60)
             .background {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill((isAutoMode ? Color.orange : Color.gray).gradient)
+                    .fill((autoSaveToMemories ? Color.green : Color.blue).gradient)
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -266,21 +285,29 @@ extension InstantCameraView {
         }
     }
     
-    private var captureButton: some View {
-        Button(action: { 
+        private var captureButton: some View {
+        Button(action: {
             HapticManager.shared.cameraShutter()
             Task {
                 await cameraManager.capturePhoto()
             }
         }) {
-            Circle()
-                .stroke(.white, lineWidth: 4)
-                .frame(width: 80, height: 80)
-                .background(
-                    Circle()
-                        .fill(.clear)
-                        .frame(width: 72, height: 72)
-                )
+            VStack(spacing: 4) {
+                Image(systemName: "camera.fill")
+                    .font(.title2)
+                Text("Capture")
+                    .font(.caption)
+            }
+            .foregroundStyle(.white)
+            .frame(width: 70, height: 60)
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.red.gradient)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.3), lineWidth: 1)
+            )
         }
     }
     
@@ -289,11 +316,10 @@ extension InstantCameraView {
             HapticManager.shared.lightTap()
             dismiss()
         }) {
-            Image(systemName: "xmark")
-                .font(.title2)
+            Text("Cancel")
+                .font(.body)
+                .fontWeight(.medium)
                 .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
         }
     }
     
@@ -679,23 +705,18 @@ struct CapturedImageUploadView: View {
         
         Task {
             do {
-                // Create MediaItem for upload
-                let mediaItem = MediaItem(
-                    id: UUID().uuidString,
+                // Upload image to Firebase Storage
+                let uploadResult = try await firebaseService.uploadMedia(
+                    imageData,
                     userId: firebaseService.currentUser?.uid ?? "",
-                    username: "Unknown", // This should be fetched from user profile
-                    mediaURL: "", // Will be set after upload
-                    mediaType: .photo,
+                    username: "Unknown", // TODO: Get from user profile
                     caption: caption.isEmpty ? nil : caption,
-                    location: nil, // Could add location if needed
+                    location: nil,
                     tags: [],
                     appliedFilter: nil,
-                    frameTheme: nil,
-                    familyCode: "1000" // This should be fetched from user profile
+                    frameTheme: nil
                 )
                 
-                // Upload to Firebase (this would need to be implemented in FirebaseService)
-                // For now, just simulate success
                 await MainActor.run {
                     isUploading = false
                     alertMessage = "Photo uploaded successfully!"
