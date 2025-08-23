@@ -228,24 +228,42 @@ struct ProfilePictureEditorView: View {
         
         Task {
             do {
-                // Upload to Firebase Storage
+                // Upload to Firebase Storage - ensure profiles folder structure
                 let filename = "profile_\(user.uid)_\(UUID().uuidString).jpg"
-                let storageRef = Storage.storage().reference().child("profiles/\(filename)")
+                let profilesRef = Storage.storage().reference().child("profiles")
+                let storageRef = profilesRef.child(filename)
                 
                 print("🔄 Uploading profile picture to: profiles/\(filename)")
                 print("📤 User ID: \(user.uid)")
                 print("📦 Image data size: \(imageData.count) bytes")
+                print("🗂️ Storage path: \(storageRef.fullPath)")
                 
-                _ = try await storageRef.putDataAsync(imageData)
+                // Set metadata for the uploaded file
+                let metadata = StorageMetadata()
+                metadata.contentType = "image/jpeg"
+                metadata.customMetadata = [
+                    "userId": user.uid,
+                    "uploadDate": ISO8601DateFormatter().string(from: Date()),
+                    "fileType": "profile_picture"
+                ]
+                
+                _ = try await storageRef.putDataAsync(imageData, metadata: metadata)
                 print("✅ Profile picture uploaded successfully")
                 
                 let downloadURL = try await storageRef.downloadURL()
                 print("🔗 Download URL: \(downloadURL.absoluteString)")
                 
-                // Update user profile with new avatar URL
-                try await firebaseService.updateUserProfile(userId: user.uid, updates: [
-                    "avatarURL": downloadURL.absoluteString
-                ])
+                // Verify the upload by checking if file exists
+                do {
+                    let _ = try await storageRef.getMetadata()
+                    print("✅ File verified to exist in Firebase Storage")
+                } catch {
+                    print("⚠️ Warning: Could not verify file existence: \(error)")
+                }
+                
+                // Update user profile with new avatar URL using dedicated function
+                try await firebaseService.updateAvatar(userId: user.uid, avatarURL: downloadURL.absoluteString)
+                print("✅ Avatar URL updated in Firestore users collection")
                 
                 DispatchQueue.main.async {
                     self.isProcessing = false
