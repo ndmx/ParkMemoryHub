@@ -66,6 +66,13 @@ struct PlannerView: View {
                                     selectedActivity = activity
                                 }
                             )
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    deleteActivity(activity)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                     .padding()
@@ -134,6 +141,27 @@ struct PlannerView: View {
                 await loadActivitiesAsync()
             } catch {
                 print("Failed to vote: \(error)")
+            }
+        }
+    }
+    
+    private func deleteActivity(_ activity: Activity) {
+        // Add haptic feedback for iOS 18
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        Task {
+            do {
+                // Delete from Firebase
+                try await firebaseService.deleteActivity(activity)
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    activities.removeAll { $0.id == activity.id }
+                }
+            } catch {
+                print("❌ Error deleting activity: \(error.localizedDescription)")
+                // Could add an alert here for user feedback
             }
         }
     }

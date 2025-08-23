@@ -62,6 +62,13 @@ struct AlbumView: View {
                             MediaItemCard(item: item) {
                                 selectedMediaItem = item
                             }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    deleteMemory(item)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                     .padding()
@@ -113,6 +120,27 @@ struct AlbumView: View {
             DispatchQueue.main.async {
                 self.isLoading = false
                 // Handle error
+            }
+        }
+    }
+    
+    private func deleteMemory(_ mediaItem: MediaItem) {
+        // Add haptic feedback for iOS 18
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        Task {
+            do {
+                // Delete from Firebase
+                try await firebaseService.deleteMediaItem(mediaItem)
+                
+                // Update UI on main thread
+                await MainActor.run {
+                    mediaItems.removeAll { $0.id == mediaItem.id }
+                }
+            } catch {
+                print("❌ Error deleting memory: \(error.localizedDescription)")
+                // Could add an alert here for user feedback
             }
         }
     }

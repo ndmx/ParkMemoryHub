@@ -541,4 +541,23 @@ class FirebaseService: ObservableObject {
             "Storage": true
         ]
     }
+    
+    // MARK: - Delete Functions
+    
+    func deleteMediaItem(_ mediaItem: MediaItem) async throws {
+        // Delete from Firestore
+        try await db.collection("media").document(mediaItem.id).delete()
+        
+        // Delete from Storage if URL exists
+        if !mediaItem.mediaURL.isEmpty {
+            let storage = Storage.storage()
+            let storageRef = storage.reference(forURL: mediaItem.mediaURL)
+            try await storageRef.delete()
+        }
+    }
+    
+    func deleteActivity(_ activity: Activity) async throws {
+        // Delete from Firestore
+        try await db.collection("activities").document(activity.id).delete()
+    }
 }
