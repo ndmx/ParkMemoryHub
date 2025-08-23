@@ -33,7 +33,7 @@ struct InstantCameraView: View {
         .animation(.snappy(duration: 0.3), value: isDepthEnabled)
         .animation(.snappy(duration: 0.3), value: isAutoMode)
         .sheet(isPresented: $showLibrary) {
-            Text("Photo Library")
+            PhotoPickerView()
         }
         .sheet(isPresented: $showFilters) {
             Text("Camera Filters")
@@ -109,21 +109,26 @@ struct InstantCameraView: View {
     }
     
     private var bottomCarousel: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                libraryButton
-                depthButton
-                autoModeButton
-                effectsButton
-                captureButton
+        VStack(spacing: 20) {
+            // Main capture button centered
+            captureButton
+            
+            // Other options in horizontal scroll
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    libraryButton
+                    depthButton
+                    autoModeButton
+                    effectsButton
+                }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
-        }
-        .scrollContentBackground(.hidden)
-        .scrollTransition { content, phase in
-            content
-                .opacity(phase.isIdentity ? 1 : 0.7)
-                .scaleEffect(phase.isIdentity ? 1 : 0.95)
+            .scrollContentBackground(.hidden)
+            .scrollTransition { content, phase in
+                content
+                    .opacity(phase.isIdentity ? 1 : 0.7)
+                    .scaleEffect(phase.isIdentity ? 1 : 0.95)
+            }
         }
         .padding(.bottom, 40)
     }
@@ -227,24 +232,18 @@ struct InstantCameraView: View {
     private var captureButton: some View {
         Button(action: { 
             HapticManager.shared.cameraShutter()
-            cameraManager.capturePhoto()
+            Task {
+                await cameraManager.capturePhoto()
+            }
         }) {
-            VStack(spacing: 4) {
-                Image(systemName: "camera.fill")
-                    .font(.title2)
-                Text("Capture")
-                    .font(.caption)
-            }
-            .foregroundStyle(.white)
-            .frame(width: 70, height: 60)
-            .background {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.red.gradient)
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(.white.opacity(0.3), lineWidth: 1)
-            )
+            Circle()
+                .stroke(.white, lineWidth: 4)
+                .frame(width: 80, height: 80)
+                .background(
+                    Circle()
+                        .fill(.clear)
+                        .frame(width: 72, height: 72)
+                )
         }
     }
     
@@ -405,16 +404,45 @@ class CameraManager: ObservableObject {
         }
     }
     
-    func capturePhoto() {
-        guard let output = photoOutput else { return }
+    func capturePhoto() async {
+        guard let output = photoOutput else { 
+            print("❌ No photo output available")
+            return 
+        }
         
+        print("📸 Capturing photo...")
         let settings = AVCapturePhotoSettings()
-        output.capturePhoto(with: settings, delegate: PhotoCaptureDelegate())
+        settings.flashMode = .auto
+        
+        let delegate = PhotoCaptureDelegate()
+        output.capturePhoto(with: settings, delegate: delegate)
     }
     
     func flipCamera() {
-        // Implementation for camera flip
-        // This would switch between front and back camera
+        guard let session = captureSession else { return }
+        
+        session.beginConfiguration()
+        
+        // Remove current input
+        if let currentInput = session.inputs.first as? AVCaptureDeviceInput {
+            session.removeInput(currentInput)
+            
+            // Switch camera position
+            let newPosition: AVCaptureDevice.Position = currentInput.device.position == .back ? .front : .back
+            
+            // Get new camera
+            if let newCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: newPosition),
+               let newInput = try? AVCaptureDeviceInput(device: newCamera) {
+                
+                if session.canAddInput(newInput) {
+                    session.addInput(newInput)
+                    currentCamera = newCamera
+                    print("📷 Camera flipped to \(newPosition == .front ? "front" : "back")")
+                }
+            }
+        }
+        
+        session.commitConfiguration()
     }
     
     func setFlashMode(_ mode: AVCaptureDevice.FlashMode) {
@@ -448,12 +476,66 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         // Handle captured photo
         if let error = error {
-            print("Error capturing photo: \(error)")
+            print("❌ Error capturing photo: \(error)")
+            HapticManager.shared.error()
             return
         }
         
-        guard let imageData = photo.fileDataRepresentation() else { return }
-        // Process and save the image
+        guard let imageData = photo.fileDataRepresentation(),
+              let uiImage = UIImage(data: imageData) else { 
+            print("❌ Failed to create image from captured data")
+            HapticManager.shared.error()
+            return 
+        }
+        
+        print("✅ Photo captured successfully")
+        HapticManager.shared.success()
+        
+        // Save to photo library
+        DispatchQueue.main.async {
+            UIImageWriteToSavedPhotosAlbum(uiImage, nil, nil, nil)
+            print("📱 Photo saved to library")
+        }
+    }
+}
+
+// MARK: - Photo Picker View
+struct PhotoPickerView: UIViewControllerRepresentable {
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .photoLibrary
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: PhotoPickerView
+        
+        init(_ parent: PhotoPickerView) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                print("📷 Photo selected from library")
+                HapticManager.shared.success()
+                // Handle the selected image here
+                // You could save it or process it as needed
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
     }
 }
 

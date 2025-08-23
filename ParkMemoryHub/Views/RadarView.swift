@@ -243,36 +243,31 @@ struct RadarView: View {
             loadFamilyMembers()
             locationManager.requestLocationPermission()
             setupHaptics()
-            
-            // Update map position to current location when available (only if significantly different)
-            if let location = locationManager.currentLocation {
-                print("📍 RadarView: Found current location, checking if map needs centering")
-                
-                // Get current center from map position
-                // For iOS 18+, we'll use a simple approach to get center from current location
-                let currentCenter: CLLocationCoordinate2D = locationManager.currentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: 28.4177, longitude: -81.5812)
-                
-                let newCenter = location.coordinate
-                
-                // Only update if the distance is significant (more than ~100 meters)
-                let distance = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
-                    .distance(from: CLLocation(latitude: newCenter.latitude, longitude: newCenter.longitude))
-                
-                if distance > 100 {
-                    print("📍 RadarView: Centering map on current location (distance: \(Int(distance))m)")
-                    withAnimation(.easeInOut(duration: 1.0)) {
-                        mapPosition = .region(MKCoordinateRegion(
-                            center: newCenter,
-                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                        ))
-                    }
-                }
-            } else {
-                print("⚠️ RadarView: No current location available")
+            centerOnUserLocation()
+        }
+        .onChange(of: locationManager.currentLocation) { oldLocation, newLocation in
+            // Auto-center when location becomes available or changes significantly
+            if let newLocation = newLocation {
+                centerOnUserLocation()
             }
         }
         .sheet(isPresented: $showARView) {
             ARRadarView(familyMembers: familyMembers)
+        }
+    }
+    
+    private func centerOnUserLocation() {
+        guard let location = locationManager.currentLocation else {
+            print("⚠️ RadarView: No current location available for centering")
+            return
+        }
+        
+        print("📍 RadarView: Auto-centering map on user location")
+        withAnimation(.easeInOut(duration: 1.0)) {
+            mapPosition = .region(MKCoordinateRegion(
+                center: location.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            ))
         }
     }
     

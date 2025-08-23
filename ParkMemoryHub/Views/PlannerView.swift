@@ -83,32 +83,34 @@ struct PlannerView: View {
                         .opacity(0.7)
                     }
                     
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
-                                ActivityCard(
-                                    activity: activity,
-                                    onVote: { voteType in
-                                        voteOnActivity(activity, voteType: voteType)
-                                    },
-                                    onTap: {
-                                        selectedActivity = activity
-                                    },
-                                    onDelete: {
-                                        deleteActivityAtIndex(index)
-                                    }
-                                )
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        deleteActivityAtIndex(index)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                    List {
+                        ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
+                            ActivityCard(
+                                activity: activity,
+                                onVote: { voteType in
+                                    voteOnActivity(activity, voteType: voteType)
+                                },
+                                onTap: {
+                                    selectedActivity = activity
+                                },
+                                onDelete: {
+                                    deleteActivityAtIndex(index)
+                                }
+                            )
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    deleteActivityAtIndex(index)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
                         }
-                        .padding()
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
         }

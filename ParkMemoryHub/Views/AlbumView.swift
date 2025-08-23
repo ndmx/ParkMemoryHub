@@ -85,29 +85,31 @@ struct AlbumView: View {
                         .opacity(0.7)
                     }
                     
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(Array(mediaItems.enumerated()), id: \.element.id) { index, item in
-                                MediaItemCard(
-                                    item: item,
-                                    onTap: {
-                                        selectedMediaItem = item
-                                    },
-                                    onDelete: {
-                                        deleteMemoryAtIndex(index)
-                                    }
-                                )
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        deleteMemoryAtIndex(index)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                    List {
+                        ForEach(Array(mediaItems.enumerated()), id: \.element.id) { index, item in
+                            MediaItemCard(
+                                item: item,
+                                onTap: {
+                                    selectedMediaItem = item
+                                },
+                                onDelete: {
+                                    deleteMemoryAtIndex(index)
+                                }
+                            )
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    deleteMemoryAtIndex(index)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
                         }
-                        .padding()
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
         }
