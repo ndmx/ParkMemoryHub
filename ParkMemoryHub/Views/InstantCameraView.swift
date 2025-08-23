@@ -12,6 +12,8 @@ struct InstantCameraView: View {
     @State private var flashMode: AVCaptureDevice.FlashMode = .auto
     @State private var showFilters = false
     @State private var showLibrary = false
+    @State private var capturedImage: UIImage?
+    @State private var showCapturedImageView = false
     
     var body: some View {
         NavigationStack {
@@ -38,8 +40,25 @@ struct InstantCameraView: View {
         .sheet(isPresented: $showFilters) {
             Text("Camera Filters")
         }
+        .sheet(isPresented: $showCapturedImageView) {
+            if let image = capturedImage {
+                CapturedImageUploadView(image: image) {
+                    showCapturedImageView = false
+                    capturedImage = nil
+                }
+            }
+        }
     }
     
+    private func handleCapturedPhoto(_ image: UIImage) {
+        capturedImage = image
+        showCapturedImageView = true
+    }
+}
+
+
+
+extension InstantCameraView {
     private var cameraPreviewView: some View {
         Group {
             if let previewLayer = cameraManager.previewLayer {
@@ -55,19 +74,33 @@ struct InstantCameraView: View {
                     )
             }
         }
-        .onAppear {
-            Task {
-                await cameraManager.setupCamera()
-                await fetchCurrentLocation()
+                    .onAppear {
+                // Set up camera manager callback
+                cameraManager.onPhotoCaptured = { [weak cameraManager] image in
+                    self.handleCapturedPhoto(image)
+                }
+                Task {
+                    await cameraManager.setupCamera()
+                    await fetchCurrentLocation()
+                }
             }
-        }
     }
     
     private var overlayContent: some View {
-        VStack {
-            Spacer()
-            overlayStamps
-            bottomCarousel
+        GeometryReader { geometry in
+            VStack {
+                Spacer()
+                
+                // Text positioned at 30% from bottom
+                overlayStamps
+                    .padding(.bottom, geometry.size.height * 0.3)
+                
+                Spacer()
+                
+                // Tabs positioned at 20% from bottom  
+                bottomCarousel
+                    .padding(.bottom, geometry.size.height * 0.2)
+            }
         }
     }
     
@@ -78,7 +111,6 @@ struct InstantCameraView: View {
             locationStamp
         }
         .padding(.horizontal)
-        .padding(.bottom, 140)
     }
     
     private var timestampStamp: some View {
@@ -109,28 +141,33 @@ struct InstantCameraView: View {
     }
     
     private var bottomCarousel: some View {
-        VStack(spacing: 20) {
-            // Main capture button centered
-            captureButton
-            
-            // Other options in horizontal scroll
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    libraryButton
-                    depthButton
-                    autoModeButton
-                    effectsButton
-                }
-                .padding(.horizontal)
+        ZStack {
+            // Bottom tabs row
+            HStack(spacing: 8) {
+                libraryButton
+                depthButton
+                
+                // Spacer for capture button
+                Spacer()
+                    .frame(width: 80)
+                
+                autoModeButton
+                effectsButton
             }
-            .scrollContentBackground(.hidden)
-            .scrollTransition { content, phase in
-                content
-                    .opacity(phase.isIdentity ? 1 : 0.7)
-                    .scaleEffect(phase.isIdentity ? 1 : 0.95)
+            .padding(.horizontal, 40)
+            
+            // Capture button hovering above and centered
+            VStack {
+                captureButton
+                    .offset(y: -20) // Hover above the tabs
+                
+                // Icon label below capture button
+                Text("Capture")
+                    .font(.caption2)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.8), radius: 1, x: 0, y: 0.5)
             }
         }
-        .padding(.bottom, 40)
     }
     
     private var libraryButton: some View {
@@ -256,7 +293,7 @@ struct InstantCameraView: View {
                 .font(.title2)
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
         }
     }
     
@@ -276,7 +313,7 @@ struct InstantCameraView: View {
                 .font(.title2)
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
         }
     }
     
@@ -289,7 +326,7 @@ struct InstantCameraView: View {
                 .font(.title2)
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
         }
     }
     
@@ -352,6 +389,7 @@ class CameraManager: ObservableObject {
     private var captureSession: AVCaptureSession?
     private var photoOutput: AVCapturePhotoOutput?
     private var currentCamera: AVCaptureDevice?
+    var onPhotoCaptured: ((UIImage) -> Void)?
     
     func setupCamera() async {
         guard await requestCameraPermission() else { return }
@@ -414,7 +452,11 @@ class CameraManager: ObservableObject {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .auto
         
-        let delegate = PhotoCaptureDelegate()
+        let delegate = PhotoCaptureDelegate { image in
+            await MainActor.run {
+                self.onPhotoCaptured?(image)
+            }
+        }
         output.capturePhoto(with: settings, delegate: delegate)
     }
     
@@ -473,6 +515,12 @@ struct CameraPreviewUIView: UIViewRepresentable {
 
 // MARK: - Photo Capture Delegate
 class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+    let onPhotoCapture: (UIImage) async -> Void
+    
+    init(onPhotoCapture: @escaping (UIImage) async -> Void) {
+        self.onPhotoCapture = onPhotoCapture
+    }
+    
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         // Handle captured photo
         if let error = error {
@@ -492,9 +540,12 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
         HapticManager.shared.success()
         
         // Save to photo library
-        DispatchQueue.main.async {
-            UIImageWriteToSavedPhotosAlbum(uiImage, nil, nil, nil)
-            print("📱 Photo saved to library")
+        UIImageWriteToSavedPhotosAlbum(uiImage, nil, nil, nil)
+        print("📱 Photo saved to library")
+        
+        // Pass image to callback for upload interface
+        Task {
+            await onPhotoCapture(uiImage)
         }
     }
 }
@@ -535,6 +586,131 @@ struct PhotoPickerView: UIViewControllerRepresentable {
         
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
+        }
+    }
+}
+
+// MARK: - Captured Image Upload View
+struct CapturedImageUploadView: View {
+    let image: UIImage
+    let onDismiss: () -> Void
+    @StateObject private var firebaseService = FirebaseService.shared
+    @State private var caption = ""
+    @State private var isUploading = false
+    @State private var showAlert = false
+    @State private var alertMessage = ""
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                // Captured photo
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxHeight: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                
+                // Caption input
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Add a caption")
+                        .font(.headline)
+                    
+                    TextField("What's happening?", text: $caption, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                        .lineLimit(3...6)
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+                
+                // Upload button
+                Button(action: uploadPhoto) {
+                    if isUploading {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Uploading...")
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "icloud.and.arrow.up")
+                            Text("Share to Family")
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .disabled(isUploading)
+                .padding(.horizontal)
+            }
+            .padding()
+            .navigationTitle("Share Photo")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        onDismiss()
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .alert("Photo Upload", isPresented: $showAlert) {
+            Button("OK") {
+                if alertMessage.contains("successfully") {
+                    onDismiss()
+                    dismiss()
+                }
+            }
+        } message: {
+            Text(alertMessage)
+        }
+    }
+    
+    private func uploadPhoto() {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
+        
+        isUploading = true
+        HapticManager.shared.lightTap()
+        
+        Task {
+            do {
+                // Create MediaItem for upload
+                let mediaItem = MediaItem(
+                    id: UUID().uuidString,
+                    userId: firebaseService.currentUser?.uid ?? "",
+                    username: "Unknown", // This should be fetched from user profile
+                    mediaURL: "", // Will be set after upload
+                    mediaType: .photo,
+                    caption: caption.isEmpty ? nil : caption,
+                    location: nil, // Could add location if needed
+                    tags: [],
+                    appliedFilter: nil,
+                    frameTheme: nil,
+                    familyCode: "1000" // This should be fetched from user profile
+                )
+                
+                // Upload to Firebase (this would need to be implemented in FirebaseService)
+                // For now, just simulate success
+                await MainActor.run {
+                    isUploading = false
+                    alertMessage = "Photo uploaded successfully!"
+                    showAlert = true
+                    HapticManager.shared.success()
+                }
+                
+            } catch {
+                await MainActor.run {
+                    isUploading = false
+                    alertMessage = "Failed to upload photo: \(error.localizedDescription)"
+                    showAlert = true
+                    HapticManager.shared.error()
+                }
+            }
         }
     }
 }
