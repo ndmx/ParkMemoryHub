@@ -1,9 +1,15 @@
 import SwiftUI
 
 struct MediaDetailView: View {
-    let item: MediaItem
+    @State private var item: MediaItem
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var firebaseService = FirebaseService.shared
     @State private var isLiked = false
+    @State private var isLoading = false
+    
+    init(item: MediaItem) {
+        self._item = State(initialValue: item)
+    }
     
     var body: some View {
         NavigationStack {
@@ -43,8 +49,13 @@ struct MediaDetailView: View {
                             
                             Button(action: toggleLike) {
                                 HStack(spacing: 4) {
-                                    Image(systemName: isLiked ? "heart.fill" : "heart")
-                                        .foregroundColor(isLiked ? .red : .gray)
+                                    if isLoading {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                                            .foregroundColor(isLiked ? .red : .gray)
+                                    }
                                     
                                     Text("\(item.likes.count)")
                                         .font(.caption)
@@ -55,6 +66,7 @@ struct MediaDetailView: View {
                                 .background(Color(.systemGray6))
                                 .cornerRadius(16)
                             }
+                            .disabled(isLoading)
                         }
                         
                         // Caption
@@ -201,17 +213,61 @@ struct MediaDetailView: View {
             }
         }
         .onAppear {
-            // Check if current user has liked this item
-            // In a real app, this would check against the current user's ID
-            isLiked = false
+            checkInitialLikeStatus()
         }
     }
     
+    private func checkInitialLikeStatus() {
+        guard let userId = firebaseService.currentUser?.uid else { return }
+        isLiked = item.likes.contains(userId)
+    }
+    
     private func toggleLike() {
+        guard let userId = firebaseService.currentUser?.uid else { return }
+        
+        // Optimistic UI update
+        let wasLiked = isLiked
         isLiked.toggle()
         
-        // In a real app, this would update the like status in Firebase
-        // For demo purposes, we'll just toggle the local state
+        // Update local item likes array
+        if isLiked {
+            if !item.likes.contains(userId) {
+                item.likes.append(userId)
+            }
+        } else {
+            item.likes.removeAll { $0 == userId }
+        }
+        
+        // Add haptic feedback
+        HapticManager.shared.lightTap()
+        
+        isLoading = true
+        
+        Task {
+            do {
+                try await firebaseService.toggleLike(mediaId: item.id, isLiked: isLiked)
+                
+                await MainActor.run {
+                    isLoading = false
+                    HapticManager.shared.success()
+                }
+            } catch {
+                // Revert the optimistic update if Firebase update fails
+                await MainActor.run {
+                    isLiked = wasLiked
+                    if wasLiked {
+                        if !item.likes.contains(userId) {
+                            item.likes.append(userId)
+                        }
+                    } else {
+                        item.likes.removeAll { $0 == userId }
+                    }
+                    isLoading = false
+                    HapticManager.shared.error()
+                }
+                print("❌ Error toggling like: \(error.localizedDescription)")
+            }
+        }
     }
 }
 

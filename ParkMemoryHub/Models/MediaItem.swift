@@ -14,7 +14,7 @@ struct MediaItem: Identifiable, Codable {
     let appliedFilter: String?
     let frameTheme: String?
     let createdAt: Date
-    let likes: [String] // Array of user IDs who liked
+    var likes: [String] // Array of user IDs who liked
     let familyCode: String // Added for consistency with Firestore rules
     
     enum MediaType: String, Codable, CaseIterable {
