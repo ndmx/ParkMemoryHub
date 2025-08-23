@@ -249,14 +249,15 @@ struct RadarView: View {
                 print("📍 RadarView: Found current location, checking if map needs centering")
                 
                 // Get current center from map position
-                let currentCenter: CLLocationCoordinate2D = {
-                    switch mapPosition {
-                    case .region(let region):
-                        return region.center
-                    default:
-                        return CLLocationCoordinate2D(latitude: 28.4177, longitude: -81.5812) // Default
-                    }
-                }()
+                let currentCenter: CLLocationCoordinate2D
+                switch mapPosition {
+                case .region(let region):
+                    currentCenter = region.center
+                case .camera(let camera):
+                    currentCenter = camera.centerCoordinate
+                default:
+                    currentCenter = CLLocationCoordinate2D(latitude: 28.4177, longitude: -81.5812) // Default
+                }
                 
                 let newCenter = location.coordinate
                 
