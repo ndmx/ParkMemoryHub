@@ -17,6 +17,8 @@ struct InstantCameraView: View {
     @State private var autoSaveToMemories: Bool
     @State private var showToast = false
     @State private var toastMessage = ""
+    @State private var currentUsername = "Loading..."
+    @State private var textPosition: CGSize = .zero
     
     // Add initializer to control auto-save behavior
     init(autoSaveToMemories: Bool = true) {
@@ -68,7 +70,7 @@ struct InstantCameraView: View {
         }
         .sheet(isPresented: $showCapturedImageView) {
             if let image = capturedImage {
-                CapturedImageUploadView(image: image) {
+                CapturedImageUploadView(image: image, username: currentUsername) {
                     showCapturedImageView = false
                     capturedImage = nil
                 }
@@ -80,14 +82,9 @@ struct InstantCameraView: View {
         print("🖼️ Image captured, size: \(image.size)")
         capturedImage = image
         
-        if autoSaveToMemories {
-            // Auto-save to memories
-            autoSavePhoto(image)
-        } else {
-            // Show preview for manual upload
-            DispatchQueue.main.async {
-                self.showCapturedImageView = true
-            }
+        // Always show preview - let user decide what to do
+        DispatchQueue.main.async {
+            self.showCapturedImageView = true
         }
     }
     
@@ -104,7 +101,7 @@ struct InstantCameraView: View {
                 let mediaId = try await FirebaseService.shared.uploadMedia(
                     imageData,
                     userId: FirebaseService.shared.currentUser?.uid ?? "",
-                    username: "Camera User", // TODO: Get from user profile
+                    username: currentUsername,
                     caption: "Auto-saved from camera",
                     location: nil,
                     tags: ["camera"],
@@ -140,6 +137,23 @@ struct InstantCameraView: View {
             }
         }
     }
+    
+    private func fetchCurrentUsername() async {
+        guard let userId = FirebaseService.shared.currentUser?.uid else { return }
+        
+        do {
+            if let userProfile = try await FirebaseService.shared.getUserProfile(userId: userId) {
+                await MainActor.run {
+                    currentUsername = userProfile.username
+                }
+            }
+        } catch {
+            print("❌ Failed to fetch username: \(error)")
+            await MainActor.run {
+                currentUsername = "Anonymous"
+            }
+        }
+    }
 }
 
 
@@ -168,6 +182,7 @@ extension InstantCameraView {
                 Task {
                     await cameraManager.setupCamera()
                     await fetchCurrentLocation()
+                    await fetchCurrentUsername()
                 }
             }
     }
@@ -194,6 +209,13 @@ extension InstantCameraView {
             locationStamp
         }
         .padding(.horizontal)
+        .offset(textPosition)
+        .gesture(
+            DragGesture()
+                .onChanged { gesture in
+                    textPosition = gesture.translation
+                }
+        )
     }
     
     private var timestampStamp: some View {
@@ -666,6 +688,7 @@ struct PhotoPickerView: UIViewControllerRepresentable {
 // MARK: - Captured Image Upload View
 struct CapturedImageUploadView: View {
     let image: UIImage
+    let username: String
     let onDismiss: () -> Void
     @StateObject private var firebaseService = FirebaseService.shared
     @State private var caption = ""
@@ -756,7 +779,7 @@ struct CapturedImageUploadView: View {
                 let uploadResult = try await firebaseService.uploadMedia(
                     imageData,
                     userId: firebaseService.currentUser?.uid ?? "",
-                    username: "Unknown", // TODO: Get from user profile
+                    username: username,
                     caption: caption.isEmpty ? nil : caption,
                     location: nil,
                     tags: [],
