@@ -2,6 +2,38 @@ import SwiftUI
 import AVFoundation
 import CoreLocation
 
+enum CameraFilter: String, CaseIterable {
+    case none = "None"
+    case vivid = "Vivid"
+    case dramatic = "Dramatic"
+    case brilliant = "Brilliant"
+    case mono = "Mono"
+    case noir = "Noir"
+    case vintage = "Vintage"
+    case chrome = "Chrome"
+    case fade = "Fade"
+    case instant = "Instant"
+    
+    var displayName: String {
+        return self.rawValue
+    }
+    
+    var icon: String {
+        switch self {
+        case .none: return "camera"
+        case .vivid: return "sun.max.fill"
+        case .dramatic: return "bolt.fill"
+        case .brilliant: return "sparkles"
+        case .mono: return "circle.lefthalf.filled"
+        case .noir: return "moon.fill"
+        case .vintage: return "camera.vintage"
+        case .chrome: return "metallurgy"
+        case .fade: return "cloud.fill"
+        case .instant: return "camera.aperture"
+        }
+    }
+}
+
 struct InstantCameraView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var cameraManager = CameraManager()
@@ -14,16 +46,12 @@ struct InstantCameraView: View {
     @State private var showLibrary = false
     @State private var capturedImage: UIImage?
     @State private var showCapturedImageView = false
-    @State private var autoSaveToMemories: Bool
-    @State private var showToast = false
-    @State private var toastMessage = ""
+
     @State private var currentUsername = "Loading..."
     @State private var textPosition: CGSize = .zero
+    @State private var selectedFilter: CameraFilter = .none
     
-    // Add initializer to control auto-save behavior
-    init(autoSaveToMemories: Bool = true) {
-        self._autoSaveToMemories = State(initialValue: autoSaveToMemories)
-    }
+
     
     var body: some View {
         NavigationStack {
@@ -31,21 +59,7 @@ struct InstantCameraView: View {
                 cameraPreviewView
                 overlayContent
                 
-                // Toast notification
-                if showToast {
-                    VStack {
-                        Spacer()
-                        Text(toastMessage)
-                            .font(.body)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.black.opacity(0.8))
-                            .cornerRadius(10)
-                            .padding(.bottom, 200)
-                        Spacer()
-                    }
-                    .transition(.opacity)
-                }
+
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -66,7 +80,9 @@ struct InstantCameraView: View {
             }
         }
         .sheet(isPresented: $showFilters) {
-            Text("Camera Filters")
+            FilterSelectionView(selectedFilter: $selectedFilter) {
+                showFilters = false
+            }
         }
         .sheet(isPresented: $showCapturedImageView) {
             if let image = capturedImage {
@@ -88,55 +104,9 @@ struct InstantCameraView: View {
         }
     }
     
-    private func autoSavePhoto(_ image: UIImage) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else { 
-            print("❌ Failed to convert image to JPEG data")
-            return 
-        }
-        
-        print("📤 Auto-saving photo to Firebase...")
-        
-        Task {
-            do {
-                let mediaId = try await FirebaseService.shared.uploadMedia(
-                    imageData,
-                    userId: FirebaseService.shared.currentUser?.uid ?? "",
-                    username: currentUsername,
-                    caption: "Auto-saved from camera",
-                    location: nil,
-                    tags: ["camera"],
-                    appliedFilter: nil,
-                    frameTheme: nil
-                )
-                
-                await MainActor.run {
-                    HapticManager.shared.success()
-                    print("✅ Photo auto-saved to memories! ID: \(mediaId)")
-                    showToastMessage("📸 Photo saved to memories!")
-                }
-                
-            } catch {
-                await MainActor.run {
-                    HapticManager.shared.error()
-                    print("❌ Failed to auto-save photo: \(error.localizedDescription)")
-                    showToastMessage("❌ Failed to save photo")
-                }
-            }
-        }
-    }
+
     
-    private func showToastMessage(_ message: String) {
-        toastMessage = message
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showToast = true
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showToast = false
-            }
-        }
-    }
+
     
     private func fetchCurrentUsername() async {
         guard let userId = FirebaseService.shared.currentUser?.uid else { return }
@@ -254,7 +224,7 @@ extension InstantCameraView {
             HStack(spacing: 12) {
                 libraryButton
                 depthButton
-                autoModeButton
+                previewModeButton
                 effectsButton
             }
             .padding(.horizontal, 40)
@@ -310,22 +280,22 @@ extension InstantCameraView {
         }
     }
     
-    private var autoModeButton: some View {
+    private var previewModeButton: some View {
         Button(action: { 
             HapticManager.shared.lightTap()
-            autoSaveToMemories.toggle() 
+            // Always use preview mode now
         }) {
             VStack(spacing: 4) {
-                Image(systemName: autoSaveToMemories ? "square.and.arrow.down.fill" : "eye.fill")
+                Image(systemName: "eye.fill")
                     .font(.title2)
-                Text(autoSaveToMemories ? "Auto" : "Preview")
+                Text("Preview")
                     .font(.caption)
             }
             .foregroundStyle(.white)
             .frame(width: 70, height: 60)
             .background {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill((autoSaveToMemories ? Color.green : Color.blue).gradient)
+                    .fill(Color.blue.gradient)
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -340,16 +310,16 @@ extension InstantCameraView {
             showFilters = true 
         }) {
             VStack(spacing: 4) {
-                Image(systemName: "wand.and.stars")
+                Image(systemName: selectedFilter.icon)
                     .font(.title2)
-                Text("Effects")
+                Text(selectedFilter == .none ? "Effects" : selectedFilter.displayName)
                     .font(.caption)
             }
             .foregroundStyle(.white)
             .frame(width: 70, height: 60)
             .background {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.indigo.gradient)
+                    .fill((selectedFilter == .none ? Color.indigo : Color.blue).gradient)
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -404,7 +374,6 @@ extension InstantCameraView {
                 .font(.title2)
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
         }
     }
     
@@ -417,7 +386,6 @@ extension InstantCameraView {
                 .font(.title2)
                 .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(Circle().stroke(.white.opacity(0.8), lineWidth: 1))
         }
     }
     
@@ -807,6 +775,92 @@ struct CapturedImageUploadView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Filter Selection View
+struct FilterSelectionView: View {
+    @Binding var selectedFilter: CameraFilter
+    let onDismiss: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Button("Cancel") {
+                        onDismiss()
+                        dismiss()
+                    }
+                    .foregroundStyle(.blue)
+                    
+                    Spacer()
+                    
+                    Text("Camera Filters")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    Button("Done") {
+                        onDismiss()
+                        dismiss()
+                    }
+                    .foregroundStyle(.blue)
+                }
+                .padding()
+                
+                Divider()
+                
+                // Filter Grid
+                ScrollView {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 16) {
+                        ForEach(CameraFilter.allCases, id: \.self) { filter in
+                            FilterCard(
+                                filter: filter,
+                                isSelected: selectedFilter == filter
+                            ) {
+                                selectedFilter = filter
+                                HapticManager.shared.lightTap()
+                            }
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+        }
+    }
+}
+
+// MARK: - Filter Card
+struct FilterCard: View {
+    let filter: CameraFilter
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 8) {
+                // Filter Icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isSelected ? Color.blue : Color(.systemGray5))
+                        .frame(height: 80)
+                    
+                    Image(systemName: filter.icon)
+                        .font(.title)
+                        .foregroundStyle(isSelected ? .white : .primary)
+                }
+                
+                // Filter Name
+                Text(filter.displayName)
+                    .font(.caption)
+                    .foregroundStyle(isSelected ? .blue : .primary)
+                    .fontWeight(isSelected ? .medium : .regular)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 
