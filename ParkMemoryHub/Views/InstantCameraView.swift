@@ -150,7 +150,11 @@ extension InstantCameraView {
                     self.handleCapturedPhoto(image)
                 }
                 Task {
-                    await cameraManager.setupCamera()
+                    // Run camera setup on background queue for best performance
+                    await Task.detached(priority: .userInitiated) {
+                        await cameraManager.setupCamera()
+                    }.value
+                    
                     await fetchCurrentLocation()
                     await fetchCurrentUsername()
                 }
@@ -454,11 +458,16 @@ class CameraManager: ObservableObject {
         guard await requestCameraPermission() else { return }
         
         let session = AVCaptureSession()
+        session.beginConfiguration()
+        
         session.sessionPreset = .photo
         
         // Add video input
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let videoInput = try? AVCaptureDeviceInput(device: camera) else { return }
+              let videoInput = try? AVCaptureDeviceInput(device: camera) else { 
+            session.commitConfiguration()
+            return 
+        }
         
         if session.canAddInput(videoInput) {
             session.addInput(videoInput)
@@ -472,6 +481,8 @@ class CameraManager: ObservableObject {
             photoOutput = output
         }
         
+        session.commitConfiguration()
+        
         // Setup preview layer on main thread
         await MainActor.run {
             let preview = AVCaptureVideoPreviewLayer(session: session)
@@ -481,10 +492,8 @@ class CameraManager: ObservableObject {
             self.previewLayer = preview
         }
         
-        // Start capture session on background thread to avoid UI blocking
-        Task.detached(priority: .userInitiated) {
-            session.startRunning()
-        }
+        // Start capture session (already on background thread)
+        session.startRunning()
     }
     
     private func requestCameraPermission() async -> Bool {
@@ -525,28 +534,33 @@ class CameraManager: ObservableObject {
     func flipCamera() {
         guard let session = captureSession else { return }
         
-        session.beginConfiguration()
-        
-        // Remove current input
-        if let currentInput = session.inputs.first as? AVCaptureDeviceInput {
-            session.removeInput(currentInput)
+        // Perform camera reconfiguration on background queue for better performance
+        Task.detached(priority: .userInitiated) {
+            session.beginConfiguration()
             
-            // Switch camera position
-            let newPosition: AVCaptureDevice.Position = currentInput.device.position == .back ? .front : .back
-            
-            // Get new camera
-            if let newCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: newPosition),
-               let newInput = try? AVCaptureDeviceInput(device: newCamera) {
+            // Remove current input
+            if let currentInput = session.inputs.first as? AVCaptureDeviceInput {
+                session.removeInput(currentInput)
                 
-                if session.canAddInput(newInput) {
-                    session.addInput(newInput)
-                    currentCamera = newCamera
-                    print("📷 Camera flipped to \(newPosition == .front ? "front" : "back")")
+                // Switch camera position
+                let newPosition: AVCaptureDevice.Position = currentInput.device.position == .back ? .front : .back
+                
+                // Get new camera
+                if let newCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: newPosition),
+                   let newInput = try? AVCaptureDeviceInput(device: newCamera) {
+                    
+                    if session.canAddInput(newInput) {
+                        session.addInput(newInput)
+                        await MainActor.run {
+                            self.currentCamera = newCamera
+                        }
+                        print("📷 Camera flipped to \(newPosition == .front ? "front" : "back")")
+                    }
                 }
             }
+            
+            session.commitConfiguration()
         }
-        
-        session.commitConfiguration()
     }
     
     func setFlashMode(_ mode: AVCaptureDevice.FlashMode) {
