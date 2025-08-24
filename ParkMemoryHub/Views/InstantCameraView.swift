@@ -513,7 +513,10 @@ class CameraManager: ObservableObject {
             self.previewLayer = preview
         }
         
-        session.startRunning()
+        // Start capture session on background thread to avoid UI blocking
+        Task.detached(priority: .userInitiated) {
+            session.startRunning()
+        }
     }
     
     private func requestCameraPermission() async -> Bool {
@@ -792,6 +795,7 @@ struct CapturedImageUploadView: View {
                     alertMessage = "Photo uploaded successfully!"
                     showAlert = true
                     HapticManager.shared.success()
+                    print("✅ Photo uploaded successfully with ID: \(uploadResult)")
                 }
                 
             } catch {
