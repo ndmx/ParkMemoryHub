@@ -255,7 +255,7 @@ class FirebaseService: ObservableObject {
                 )
             }
             
-            return MediaItem(
+            var item = MediaItem(
                 id: document.documentID,
                 userId: data["userId"] as? String ?? "",
                 username: data["username"] as? String ?? "",
@@ -267,6 +267,10 @@ class FirebaseService: ObservableObject {
                 appliedFilter: data["appliedFilter"] as? String,
                 frameTheme: data["frameTheme"] as? String
             )
+            // Persist likes from Firestore
+            let likes = data["likes"] as? [String] ?? []
+            item.likes = likes
+            return item
         }
     }
     

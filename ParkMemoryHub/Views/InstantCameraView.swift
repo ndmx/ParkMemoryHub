@@ -1,6 +1,8 @@
 import SwiftUI
 import AVFoundation
 import CoreLocation
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 enum CameraFilter: String, CaseIterable {
     case none = "None"
@@ -51,7 +53,10 @@ struct InstantCameraView: View {
     @State private var textPosition: CGSize = .zero
     @State private var selectedFilter: CameraFilter = .none
     
+    // Baseline so overlay starts just above the capture button
+    private var overlayBaseBottomPadding: CGFloat { 80 + 20 + 12 }
 
+    
     
     var body: some View {
         NavigationStack {
@@ -59,7 +64,7 @@ struct InstantCameraView: View {
                 cameraPreviewView
                 overlayContent
                 
-
+                
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -74,6 +79,10 @@ struct InstantCameraView: View {
         .zoomTransition()
         .animation(.snappy(duration: 0.3), value: isDepthEnabled)
         .animation(.snappy(duration: 0.3), value: isAutoMode)
+        .onAppear {
+            // Start overlay just above capture button baseline
+            self.textPosition = CGSize(width: 0, height: -overlayBaseBottomPadding)
+        }
         .sheet(isPresented: $showLibrary) {
             PhotoPickerView { selectedImage in
                 handleCapturedPhoto(selectedImage)
@@ -89,6 +98,8 @@ struct InstantCameraView: View {
                 CapturedImageUploadView(image: image, username: currentUsername) {
                     showCapturedImageView = false
                     capturedImage = nil
+                    // Dismiss camera after successful upload
+                    dismiss()
                 }
             }
         }
@@ -96,18 +107,142 @@ struct InstantCameraView: View {
     
     private func handleCapturedPhoto(_ image: UIImage) {
         print("🖼️ Image captured, size: \(image.size)")
-        capturedImage = image
-        
-        // Always show preview - let user decide what to do
+        // Apply selected filter and overlay composition before preview
+        let processed = processCapturedImage(image)
+        capturedImage = processed
         DispatchQueue.main.async {
             self.showCapturedImageView = true
         }
     }
     
+    // MARK: - Processing: filters + overlays
+    private func processCapturedImage(_ image: UIImage) -> UIImage {
+        var working = image
+        if isDepthEnabled {
+            working = applyDepthEffect(to: working)
+        }
+        working = applySelectedFilter(to: working)
+        working = renderOverlays(on: working)
+        return working
+    }
 
-    
+    private func applySelectedFilter(to image: UIImage) -> UIImage {
+        guard selectedFilter != .none, let ciImage = CIImage(image: image) else { return image }
+        let context = CIContext()
+        let outputImage: CIImage
+        switch selectedFilter {
+        case .vivid:
+            let f = CIFilter.colorControls()
+            f.inputImage = ciImage
+            f.saturation = 1.4
+            f.contrast = 1.1
+            outputImage = f.outputImage ?? ciImage
+        case .dramatic:
+            let f = CIFilter.highlightShadowAdjust()
+            f.inputImage = ciImage
+            f.shadowAmount = -0.4
+            f.highlightAmount = 0.6
+            outputImage = f.outputImage ?? ciImage
+        case .brilliant:
+            let f = CIFilter.vibrance()
+            f.inputImage = ciImage
+            f.amount = 0.6
+            outputImage = f.outputImage ?? ciImage
+        case .mono:
+            let f = CIFilter.photoEffectMono()
+            f.inputImage = ciImage
+            outputImage = f.outputImage ?? ciImage
+        case .noir:
+            let f = CIFilter.photoEffectNoir()
+            f.inputImage = ciImage
+            outputImage = f.outputImage ?? ciImage
+        case .vintage:
+            let f = CIFilter.photoEffectTransfer()
+            f.inputImage = ciImage
+            outputImage = f.outputImage ?? ciImage
+        case .chrome:
+            let f = CIFilter.photoEffectChrome()
+            f.inputImage = ciImage
+            outputImage = f.outputImage ?? ciImage
+        case .fade:
+            let f = CIFilter.photoEffectFade()
+            f.inputImage = ciImage
+            outputImage = f.outputImage ?? ciImage
+        case .instant:
+            let f = CIFilter.photoEffectInstant()
+            f.inputImage = ciImage
+            outputImage = f.outputImage ?? ciImage
+        case .none:
+            outputImage = ciImage
+        }
+        if let cg = context.createCGImage(outputImage, from: outputImage.extent) {
+            return UIImage(cgImage: cg, scale: image.scale, orientation: image.imageOrientation)
+        }
+        return image
+    }
 
-    
+    private func applyDepthEffect(to image: UIImage) -> UIImage {
+        guard let ciImage = CIImage(image: image) else { return image }
+        // Simulate a depth-like vignette blur for foreground emphasis
+        let context = CIContext()
+        let blur = CIFilter.gaussianBlur()
+        blur.inputImage = ciImage
+        blur.radius = 6
+        guard let blurred = blur.outputImage else { return image }
+        // Create radial mask centered
+        let width = ciImage.extent.width
+        let height = ciImage.extent.height
+        let radius = Float(min(width, height) * 0.35)
+        let gradient = CIFilter.radialGradient()
+        gradient.center = CGPoint(x: width/2, y: height/2)
+        gradient.radius0 = radius
+        gradient.radius1 = radius * 1.4
+        gradient.color0 = CIColor(red: 1, green: 1, blue: 1, alpha: 1)
+        gradient.color1 = CIColor(red: 0, green: 0, blue: 0, alpha: 0)
+        guard let mask = gradient.outputImage?.cropped(to: ciImage.extent) else { return image }
+        let composite = CIFilter.blendWithMask()
+        composite.inputImage = ciImage
+        composite.backgroundImage = blurred
+        composite.maskImage = mask
+        guard let out = composite.outputImage, let cg = context.createCGImage(out, from: out.extent) else { return image }
+        return UIImage(cgImage: cg, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    private func renderOverlays(on image: UIImage) -> UIImage {
+        let size = image.size
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let rendered = renderer.image { ctx in
+            image.draw(in: CGRect(origin: .zero, size: size))
+            let padding: CGFloat = 16
+            let baseY = size.height - 100
+            let offsetX = textPosition.width
+            let offsetY = textPosition.height
+            // Timestamp
+            let timestamp = formattedTimestamp()
+            let tsAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
+                .foregroundColor: UIColor.white
+            ]
+            let ts = NSAttributedString(string: timestamp, attributes: tsAttrs)
+            drawText(ts, at: CGPoint(x: padding + offsetX, y: baseY + offsetY), in: ctx.cgContext)
+            // Location
+            let locAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 13, weight: .regular),
+                .foregroundColor: UIColor.white
+            ]
+            let locStr = NSAttributedString(string: location, attributes: locAttrs)
+            drawText(locStr, at: CGPoint(x: padding + offsetX, y: baseY + 24 + offsetY), in: ctx.cgContext)
+        }
+        return rendered
+    }
+
+    private func drawText(_ text: NSAttributedString, at point: CGPoint, in cg: CGContext) {
+        cg.saveGState()
+        cg.setShadow(offset: CGSize(width: 0, height: 1), blur: 2, color: UIColor.black.withAlphaComponent(0.8).cgColor)
+        text.draw(at: point)
+        cg.restoreGState()
+    }
+
     private func fetchCurrentUsername() async {
         guard let userId = FirebaseService.shared.currentUser?.uid else { return }
         
@@ -165,9 +300,9 @@ extension InstantCameraView {
         VStack {
             Spacer()
             
-            // Text overlays positioned higher up
+            // Text overlays start just above the capture button
             overlayStamps
-                .padding(.bottom, 200)
+                .padding(.bottom, overlayBaseBottomPadding)
             
             Spacer()
             
@@ -287,7 +422,9 @@ extension InstantCameraView {
     private var previewModeButton: some View {
         Button(action: { 
             HapticManager.shared.lightTap()
-            // Always use preview mode now
+            if let _ = capturedImage {
+                showCapturedImageView = true
+            }
         }) {
             VStack(spacing: 4) {
                 Image(systemName: "eye.fill")
@@ -446,54 +583,53 @@ extension InstantCameraView {
 }
 
 // MARK: - Camera Manager
-@MainActor
 class CameraManager: ObservableObject {
     @Published var previewLayer: AVCaptureVideoPreviewLayer?
     private var captureSession: AVCaptureSession?
     private var photoOutput: AVCapturePhotoOutput?
     private var currentCamera: AVCaptureDevice?
+    private let sessionQueue = DispatchQueue(label: "CameraSessionQueue")
+    // Keep a strong reference to the capture delegate until callback finishes
+    private var activePhotoCaptureDelegate: PhotoCaptureDelegate?
     var onPhotoCaptured: ((UIImage) -> Void)?
-    
+ 
     func setupCamera() async {
         guard await requestCameraPermission() else { return }
-        
-        let session = AVCaptureSession()
-        session.beginConfiguration()
-        
-        session.sessionPreset = .photo
-        
-        // Add video input
-        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let videoInput = try? AVCaptureDeviceInput(device: camera) else { 
-            session.commitConfiguration()
-            return 
+        struct CameraSetupResult { let session: AVCaptureSession; let photoOutput: AVCapturePhotoOutput?; let camera: AVCaptureDevice? }
+        let result: CameraSetupResult = await withCheckedContinuation { (continuation: CheckedContinuation<CameraSetupResult, Never>) in
+            sessionQueue.async {
+                let session = AVCaptureSession()
+                session.beginConfiguration()
+                session.sessionPreset = .photo
+                var usedCamera: AVCaptureDevice? = nil
+                // Add video input
+                if let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+                   let videoInput = try? AVCaptureDeviceInput(device: camera),
+                   session.canAddInput(videoInput) {
+                    session.addInput(videoInput)
+                    usedCamera = camera
+                }
+                // Add photo output
+                var output: AVCapturePhotoOutput? = nil
+                let photoOut = AVCapturePhotoOutput()
+                if session.canAddOutput(photoOut) {
+                    session.addOutput(photoOut)
+                    output = photoOut
+                }
+                session.commitConfiguration()
+                // Start session off main thread
+                session.startRunning()
+                continuation.resume(returning: CameraSetupResult(session: session, photoOutput: output, camera: usedCamera))
+            }
         }
-        
-        if session.canAddInput(videoInput) {
-            session.addInput(videoInput)
-            currentCamera = camera
-        }
-        
-        // Add photo output
-        let output = AVCapturePhotoOutput()
-        if session.canAddOutput(output) {
-            session.addOutput(output)
-            photoOutput = output
-        }
-        
-        session.commitConfiguration()
-        
-        // Setup preview layer on main thread
         await MainActor.run {
-            let preview = AVCaptureVideoPreviewLayer(session: session)
+            let preview = AVCaptureVideoPreviewLayer(session: result.session)
             preview.videoGravity = .resizeAspectFill
-            
-            self.captureSession = session
+            self.captureSession = result.session
+            self.photoOutput = result.photoOutput
+            self.currentCamera = result.camera
             self.previewLayer = preview
         }
-        
-        // Start capture session (already on background thread)
-        session.startRunning()
     }
     
     private func requestCameraPermission() async -> Bool {
@@ -523,42 +659,35 @@ class CameraManager: ObservableObject {
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .auto
         
-        let delegate = PhotoCaptureDelegate { image in
+        let delegate = PhotoCaptureDelegate { [weak self] image in
+            guard let self else { return }
             await MainActor.run {
                 self.onPhotoCaptured?(image)
+                // Release strong reference after delivering the image
+                self.activePhotoCaptureDelegate = nil
             }
         }
+        // Hold strong reference during capture
+        self.activePhotoCaptureDelegate = delegate
         output.capturePhoto(with: settings, delegate: delegate)
     }
     
     func flipCamera() {
         guard let session = captureSession else { return }
-        
-        // Perform camera reconfiguration on background queue for better performance
-        Task.detached(priority: .userInitiated) {
+        sessionQueue.async {
             session.beginConfiguration()
-            
             // Remove current input
             if let currentInput = session.inputs.first as? AVCaptureDeviceInput {
                 session.removeInput(currentInput)
-                
-                // Switch camera position
                 let newPosition: AVCaptureDevice.Position = currentInput.device.position == .back ? .front : .back
-                
-                // Get new camera
                 if let newCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: newPosition),
-                   let newInput = try? AVCaptureDeviceInput(device: newCamera) {
-                    
-                    if session.canAddInput(newInput) {
-                        session.addInput(newInput)
-                        await MainActor.run {
-                            self.currentCamera = newCamera
-                        }
-                        print("📷 Camera flipped to \(newPosition == .front ? "front" : "back")")
-                    }
+                   let newInput = try? AVCaptureDeviceInput(device: newCamera),
+                   session.canAddInput(newInput) {
+                    session.addInput(newInput)
+                    DispatchQueue.main.async { self.currentCamera = newCamera }
+                    print("📷 Camera flipped to \(newPosition == .front ? "front" : "back")")
                 }
             }
-            
             session.commitConfiguration()
         }
     }
@@ -681,6 +810,7 @@ struct CapturedImageUploadView: View {
     @State private var showAlert = false
     @State private var alertMessage = ""
     @Environment(\.dismiss) private var dismiss
+    @State private var showShareSheet = false
     
     var body: some View {
         NavigationStack {
@@ -700,6 +830,31 @@ struct CapturedImageUploadView: View {
                     TextField("What's happening?", text: $caption, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(3...6)
+                }
+                .padding(.horizontal)
+                
+                // Share / Save actions
+                HStack(spacing: 12) {
+                    Button {
+                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                        HapticManager.shared.success()
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.and.arrow.down")
+                            Text("Save to Photos")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    
+                    Button {
+                        showShareSheet = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("Share")
+                        }
+                    }
+                    .buttonStyle(.bordered)
                 }
                 .padding(.horizontal)
                 
@@ -739,6 +894,9 @@ struct CapturedImageUploadView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(items: [image])
         }
         .alert("Photo Upload", isPresented: $showAlert) {
             Button("OK") {
@@ -880,4 +1038,13 @@ struct FilterCard: View {
 
 #Preview {
     InstantCameraView()
+}
+
+// MARK: - Share Sheet
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

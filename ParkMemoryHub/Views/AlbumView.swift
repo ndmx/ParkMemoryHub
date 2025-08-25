@@ -96,6 +96,14 @@ struct AlbumView: View {
                                     deleteMemoryAtIndex(index)
                                 }
                             )
+                            .contextMenu {
+                                Button {
+                                    HapticManager.shared.lightTap()
+                                    saveImageToPhotos(from: item)
+                                } label: {
+                                    Label("Save to Photos", systemImage: "square.and.arrow.down")
+                                }
+                            }
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -103,8 +111,18 @@ struct AlbumView: View {
                                 Button(role: .destructive) {
                                     deleteMemoryAtIndex(index)
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    HStack {
+                                        Image(systemName: "trash")
+                                        Text("Delete")
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.red)
+                                    )
                                 }
+                                .tint(.clear)
                             }
                         }
                     }
@@ -137,6 +155,22 @@ struct AlbumView: View {
         }
         .fullScreenCover(isPresented: $showInstantCamera) {
             InstantCameraView()
+        }
+    }
+    
+    private func saveImageToPhotos(from item: MediaItem) {
+        guard let url = URL(string: item.mediaURL) else { return }
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                    await MainActor.run { HapticManager.shared.success() }
+                }
+            } catch {
+                print("❌ Failed to download image for saving: \(error)")
+                await MainActor.run { HapticManager.shared.error() }
+            }
         }
     }
     

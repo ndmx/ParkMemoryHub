@@ -1,3 +1,11 @@
+# Firebase / Google config (do not commit secrets)
+ParkMemoryHub/GoogleService-Info.plist
+
+# Xcode
+DerivedData/
+*.xcuserdatad/
+*.xcuserdata/
+.DS_Store
 # Xcode
 .DS_Store
 build/

@@ -1,3 +1,9 @@
+### Credentials hygiene
+
+- `ParkMemoryHub/GoogleService-Info.plist` is intentionally gitignored. Drop your file locally and add it to the Xcode target.
+- If a Google API key is exposed, rotate it in Google Cloud Console and add application/API restrictions.
+- To purge secrets from history, use `git filter-repo` or BFG and force push.
+
 # ParkMemory Hub 🎢📸
 
 A family-oriented iOS app designed for group trips to Disney World and Universal Studios Orlando. Capture and share memories while coordinating with your family in real-time.

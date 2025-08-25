@@ -1,3 +1,17 @@
+## GoogleService-Info.plist
+
+This file contains client keys used by Firebase/Google SDKs and should not be committed.
+
+Steps:
+1. Download your `GoogleService-Info.plist` from the Firebase Console for this iOS app bundle ID.
+2. Place it at `ParkMemoryHub/GoogleService-Info.plist` (root of the app target directory).
+3. Ensure it is added to the Xcode target (Build Phases → Copy Bundle Resources).
+4. The file is ignored by git via the root `.gitignore`.
+
+Regenerating keys:
+- If a key was exposed, rotate it in Google Cloud Console → APIs & Services → Credentials.
+- Add API/application restrictions to the regenerated key.
+
 # ParkMemory Hub - Complete Setup Guide
 
 ## 🚀 Overview

@@ -76,7 +76,7 @@ struct MediaDetailView: View {
                                 .foregroundColor(.primary)
                         }
                         
-                        // Location info
+                        // Location info with fallback text if names are missing
                         if let location = item.location {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Location")
@@ -88,13 +88,17 @@ struct MediaDetailView: View {
                                         .foregroundColor(.blue)
                                     
                                     VStack(alignment: .leading, spacing: 2) {
-                                        if let parkName = location.parkName {
+                                        if let parkName = location.parkName, !parkName.isEmpty {
                                             Text(parkName)
                                                 .font(.subheadline)
                                                 .fontWeight(.medium)
+                                        } else {
+                                            Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.secondary)
                                         }
-                                        
-                                        if let rideName = location.rideName {
+                                        if let rideName = location.rideName, !rideName.isEmpty {
                                             Text(rideName)
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
@@ -206,14 +210,37 @@ struct MediaDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                    HStack(spacing: 12) {
+                        Button {
+                            saveCurrentImage()
+                        } label: {
+                            Image(systemName: "square.and.arrow.down")
+                        }
+                        Button("Done") {
+                            dismiss()
+                        }
                     }
                 }
             }
         }
         .onAppear {
             checkInitialLikeStatus()
+        }
+    }
+    
+    private func saveCurrentImage() {
+        guard let url = URL(string: item.mediaURL) else { return }
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                    await MainActor.run { HapticManager.shared.success() }
+                }
+            } catch {
+                print("❌ Failed to download image for saving: \(error)")
+                await MainActor.run { HapticManager.shared.error() }
+            }
         }
     }
     
