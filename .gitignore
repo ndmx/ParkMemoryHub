@@ -1,5 +1,7 @@
 # Firebase / Google config (do not commit secrets)
 ParkMemoryHub/GoogleService-Info.plist
+ParkMemoryHub/firestore.rules
+ParkMemoryHub/storage.rules
 
 # Xcode
 DerivedData/

@@ -12,6 +12,16 @@ Regenerating keys:
 - If a key was exposed, rotate it in Google Cloud Console → APIs & Services → Credentials.
 - Add API/application restrictions to the regenerated key.
 
+## Firestore/Storage rules
+
+Rules files are managed in the Firebase Console and should not be committed to git history.
+
+- Local paths (gitignored):
+  - `ParkMemoryHub/firestore.rules`
+  - `ParkMemoryHub/storage.rules`
+- Edit in Firebase Console → Build → Firestore / Storage → Rules, or manage via CI/CD.
+- If needed locally, keep them untracked and deploy using the Firebase CLI (`firebase deploy --only firestore:rules,storage`).
+
 # ParkMemory Hub - Complete Setup Guide
 
 ## 🚀 Overview
