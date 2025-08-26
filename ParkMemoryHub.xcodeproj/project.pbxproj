@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		772D39092E5C5624006DF0DC /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 772D39082E5C5624006DF0DC /* FirebaseAppCheck */; };
 		77A5CEEE2E54F16E00D59221 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 77A5CEED2E54F16E00D59221 /* FirebaseAnalytics */; };
 		77A5CEF42E54F61300D59221 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 77A5CEF32E54F61300D59221 /* FirebaseAuth */; };
 		77A5CEF62E54F61300D59221 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 77A5CEF52E54F61300D59221 /* FirebaseDatabase */; };
@@ -46,6 +47,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				772D39092E5C5624006DF0DC /* FirebaseAppCheck in Frameworks */,
 				77A5CEF62E54F61300D59221 /* FirebaseDatabase in Frameworks */,
 				77A5CEF82E54F61300D59221 /* FirebaseFirestore in Frameworks */,
 				77A5CEEE2E54F16E00D59221 /* FirebaseAnalytics in Frameworks */,
@@ -102,6 +104,7 @@
 				77A5CEF92E54F61300D59221 /* FirebaseStorage */,
 				77A5CEFB2E54F66600D59221 /* FirebaseCore */,
 				77FA80862E54F82D006FC1AE /* FirebaseAnalyticsCore */,
+				772D39082E5C5624006DF0DC /* FirebaseAppCheck */,
 			);
 			productName = ParkMemoryHub;
 			productReference = 77A5CEBD2E53698900D59221 /* ParkMemoryHub.app */;
@@ -381,6 +384,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		772D39082E5C5624006DF0DC /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 77A5CEEC2E54F16E00D59221 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
 		77A5CEED2E54F16E00D59221 /* FirebaseAnalytics */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 77A5CEEC2E54F16E00D59221 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;

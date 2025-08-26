@@ -78,7 +78,8 @@ struct Activity: Identifiable, Codable {
         createdBy: String,
         familyCode: String,
         votes: [String: VoteType],
-        status: ActivityStatus
+        status: ActivityStatus,
+        createdAt: Date = Date()
     ) {
         self.id = id
         self.title = title
@@ -87,7 +88,7 @@ struct Activity: Identifiable, Codable {
         self.scheduledTime = scheduledTime
         self.createdBy = createdBy
         self.familyCode = familyCode
-        self.createdAt = Date()
+        self.createdAt = createdAt
         self.votes = votes
         self.status = status
     }

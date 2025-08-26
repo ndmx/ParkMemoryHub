@@ -22,8 +22,8 @@ struct HelpView: View {
             answer: "Use the Planner tab to create new activities. You can schedule rides, meals, or other park experiences and let family members vote on them."
         ),
         FAQ(
-            question: "What is Kid Mode?",
-            answer: "Kid Mode provides a simplified interface with larger buttons, colorful animations, and easier navigation for younger family members."
+            question: "How do I manage accessibility?",
+            answer: "Use system settings for Dynamic Type, VoiceOver, and high contrast. ParkMemoryHub supports large text, VoiceOver labels, and high-contrast colors."
         ),
         FAQ(
             question: "How do I change my profile picture?",

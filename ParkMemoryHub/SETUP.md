@@ -208,7 +208,7 @@ The app includes a Firebase connection test. Use the `FirebaseConfigTest.swift` 
 - Account deletion is supported
 
 ### 2. COPPA Compliance
-- Kid Mode provides simplified interface
+- The app supports family use with privacy-conscious defaults
 - Parental controls for family management
 
 ### 3. Data Security

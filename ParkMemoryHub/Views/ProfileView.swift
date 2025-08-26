@@ -119,17 +119,6 @@ struct ProfileView: View {
                         // Settings
                         VStack(spacing: 16) {
                             SettingsSection(title: "Preferences") {
-                                SettingsRow(
-                                    icon: "face.smiling",
-                                    title: "Kid Mode",
-                                    subtitle: "Simplified interface for younger users",
-                                    isToggle: true,
-                                    toggleValue: userProfile?.isKidMode ?? false,
-                                    toggleAction: { toggleAction in
-                                        toggleKidMode(toggleAction)
-                                    }
-                                )
-
                                 VStack(alignment: .leading, spacing: Theme.spacingS) {
                                     Text("Color Scheme")
                                         .font(Theme.captionFont)
@@ -199,10 +188,9 @@ struct ProfileView: View {
                                 Text("Sign Out")
                             }
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.red)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+                            .padding(.vertical, 16)
+                            .foregroundStyle(.white)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.brandDeleteRed))
                         }
                         .padding(.horizontal)
                         .padding(.top, 20)
@@ -272,30 +260,7 @@ struct ProfileView: View {
         }
     }
 
-    private func toggleKidMode(_ isEnabled: Bool) {
-        guard let profile = userProfile else { return }
-
-        // Update local profile
-        userProfile = UserProfile(
-            id: profile.id,
-            username: profile.username,
-            email: profile.email,
-            avatarURL: profile.avatarURL,
-            isKidMode: isEnabled,
-            familyCode: profile.familyCode
-        )
-
-        // Save to Firebase
-        Task {
-            do {
-                try await firebaseService.saveUserProfile(userProfile!)
-            } catch {
-                ErrorManager.shared.handleError(error)
-                // Revert local change on error
-                loadUserProfile()
-            }
-        }
-    }
+    // Kid Mode removed
 
     private func signOut() {
         do {
@@ -462,22 +427,34 @@ struct EditProfileView: View {
     @StateObject private var firebaseService = FirebaseService.shared
 
     @State private var username = ""
-    @State private var isKidMode = false
+    @State private var newPassword = ""
+    @State private var confirmPassword = ""
+    @State private var newEmail = ""
+    @State private var showEmailVerificationSheet = false
     @State private var isSaving = false
+    @State private var errorMessage = ""
+    @State private var showError = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Profile Information") {
                     TextField("Username", text: $username)
-
-                    Toggle("Kid Mode", isOn: $isKidMode)
                 }
-
-                Section("About Kid Mode") {
-                    Text("Kid Mode provides a simplified interface with larger buttons, colorful animations, and easier navigation for younger family members.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                
+                Section("Change Email") {
+                    TextField("New Email", text: $newEmail)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                    Button("Send Verification Link") {
+                        startEmailVerification()
+                    }
+                    .disabled(newEmail.isEmpty)
+                }
+                
+                Section("Change Password") {
+                    SecureField("New Password (min 8 chars)", text: $newPassword)
+                    SecureField("Confirm New Password", text: $confirmPassword)
                 }
             }
             .navigationTitle("Edit Profile")
@@ -496,11 +473,42 @@ struct EditProfileView: View {
                     .disabled(username.isEmpty || isSaving)
                 }
             }
+            .alert("Update Error", isPresented: $showError) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage)
+            }
+            .sheet(isPresented: $showEmailVerificationSheet) {
+                NavigationStack {
+                    VStack(spacing: 16) {
+                        Image(systemName: "envelope.badge")
+                            .font(.system(size: 44))
+                            .foregroundStyle(Theme.primaryColor)
+                        Text("Verify your new email")
+                            .font(.headline)
+                        Text("We sent a verification link to \(newEmail). Tap the link in your email to verify, then return here and press 'I've verified'.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        Button("I've verified") {
+                            Task { await checkEmailVerificationStatus() }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .foregroundStyle(.white)
+                        .primaryActionBackground()
+                    }
+                    .padding()
+                    .navigationTitle("Email Verification")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+                .presentationCornerRadius(16)
+            }
         }
         .onAppear {
             if let profile = userProfile {
                 username = profile.username
-                isKidMode = profile.isKidMode
             }
         }
     }
@@ -508,6 +516,12 @@ struct EditProfileView: View {
     private func saveProfile() {
         guard let profile = userProfile else { return }
 
+        // Validate password fields if provided
+        if !newPassword.isEmpty || !confirmPassword.isEmpty {
+            guard newPassword.count >= 8 else { presentError("Password must be at least 8 characters."); return }
+            guard newPassword == confirmPassword else { presentError("Passwords do not match."); return }
+        }
+        
         isSaving = true
 
         Task {
@@ -517,11 +531,15 @@ struct EditProfileView: View {
                     username: username,
                     email: profile.email,
                     avatarURL: profile.avatarURL,
-                    isKidMode: isKidMode,
                     familyCode: profile.familyCode
                 )
 
                 try await firebaseService.saveUserProfile(updatedProfile)
+                
+                // Update password if provided
+                if !newPassword.isEmpty {
+                    try await FirebaseAuth.Auth.auth().currentUser?.updatePassword(to: newPassword)
+                }
 
                 DispatchQueue.main.async {
                     self.isSaving = false
@@ -530,9 +548,60 @@ struct EditProfileView: View {
             } catch {
                 DispatchQueue.main.async {
                     self.isSaving = false
-                    // Handle error
+                    presentError(error.localizedDescription)
                 }
             }
+        }
+    }
+
+    private func presentError(_ message: String) {
+        errorMessage = message
+        showError = true
+    }
+
+    // MARK: - Email Verification Flow
+    private func startEmailVerification() {
+        guard !newEmail.isEmpty else { return }
+        // Attempt to send verification to new email, fallback to updateEmail then send verification on current if unavailable
+        if let user = FirebaseAuth.Auth.auth().currentUser {
+            if #available(iOS 13.0, *) {
+                user.sendEmailVerification(beforeUpdatingEmail: newEmail) { error in
+                    DispatchQueue.main.async {
+                        if let error = error {
+                            presentError(error.localizedDescription)
+                        } else {
+                            showEmailVerificationSheet = true
+                        }
+                    }
+                }
+            } else {
+                // Fallback: try direct update (not ideal) and prompt user to verify
+                user.updateEmail(to: newEmail) { error in
+                    DispatchQueue.main.async {
+                        if let error = error {
+                            presentError(error.localizedDescription)
+                        } else {
+                            showEmailVerificationSheet = true
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    private func checkEmailVerificationStatus() async {
+        guard let user = FirebaseAuth.Auth.auth().currentUser else { return }
+        do {
+            try await user.reload()
+            // After verification link is tapped, Firebase updates the email automatically
+            if user.email?.lowercased() == newEmail.lowercased() {
+                showEmailVerificationSheet = false
+            } else {
+                presentError("We haven't detected the change yet. Please tap the link in your email, then try again.")
+            }
+        } catch {
+            presentError(error.localizedDescription)
         }
     }
 }

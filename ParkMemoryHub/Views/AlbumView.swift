@@ -115,12 +115,7 @@ struct AlbumView: View {
                                         Image(systemName: "trash")
                                         Text("Delete")
                                     }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.red)
-                                    )
+                                    .deleteSwipeBackground()
                                 }
                                 .tint(.clear)
                             }
@@ -321,16 +316,14 @@ struct MediaItemCard: View {
                             .lineLimit(2)
                     }
                     
-                    // Single location tag (no duplicates)
-                    if let location = item.location?.parkName {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.caption)
-                            Text(location)
-                                .font(.caption)
-                        }
-                        .foregroundStyle(.white.opacity(0.9))
+                    // Location tag with N/A fallback
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.caption)
+                        Text(item.location?.parkName?.isEmpty == false ? (item.location?.parkName ?? "") : "N/A")
+                            .font(.caption)
                     }
+                    .foregroundStyle(.white.opacity(0.9))
                 }
                 .padding(12)
                 .background {

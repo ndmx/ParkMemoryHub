@@ -104,8 +104,13 @@ struct PlannerView: View {
                                 Button(role: .destructive) {
                                     deleteActivityAtIndex(index)
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    HStack {
+                                        Image(systemName: "trash")
+                                        Text("Delete")
+                                    }
+                                    .deleteSwipeBackground()
                                 }
+                                .tint(.clear)
                             }
                         }
                     }
@@ -333,31 +338,31 @@ struct ActivityCard: View {
                                 .font(.caption)
                                 .foregroundColor(isTimePast(scheduledTime) ? .red : .secondary)
                         }
+                        Text(formattedCreationTime())
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                     }
                 }
                 
                 // Location info
-                if let location = activity.location {
-                    HStack {
-                        Image(systemName: "location.fill")
-                            .foregroundColor(.blue)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            if let parkName = location.parkName {
-                                Text(parkName)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            }
-                            
-                            if let rideName = location.rideName {
-                                Text(rideName)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                HStack {
+                    Image(systemName: "location.fill")
+                        .foregroundColor(.blue)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        let parkName = activity.location?.parkName
+                        Text((parkName?.isEmpty == false ? parkName! : "N/A"))
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        if let rideName = activity.location?.rideName, !rideName.isEmpty {
+                            Text(rideName)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        
-                        Spacer()
                     }
+
+                    Spacer()
                 }
                 
                 // Voting section
@@ -424,6 +429,11 @@ struct ActivityCard: View {
     private func isTimePast(_ time: Date) -> Bool {
         return time < Date()
     }
+    private func formattedCreationTime() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE HH:mm"
+        return formatter.string(from: activity.createdAt)
+    }
 }
 
 struct VoteButton: View {
@@ -449,7 +459,7 @@ struct VoteButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(isSelected ? color : color.opacity(0.1))
-            .cornerRadius(8)
+            .cornerRadius(16)
         }
     }
 }

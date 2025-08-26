@@ -60,4 +60,35 @@ struct MediaItem: Identifiable, Codable {
         self.likes = []
         self.familyCode = familyCode
     }
+
+    // Firestore convenience initializer allowing server-provided createdAt
+    init(
+        id: String,
+        userId: String,
+        username: String,
+        mediaURL: String,
+        mediaType: MediaType,
+        caption: String? = nil,
+        location: LocationInfo? = nil,
+        tags: [String] = [],
+        appliedFilter: String? = nil,
+        frameTheme: String? = nil,
+        familyCode: String = "",
+        createdAt: Date,
+        likes: [String] = []
+    ) {
+        self.id = id
+        self.userId = userId
+        self.username = username
+        self.mediaURL = mediaURL
+        self.mediaType = mediaType
+        self.caption = caption
+        self.location = location
+        self.tags = tags
+        self.appliedFilter = appliedFilter
+        self.frameTheme = frameTheme
+        self.createdAt = createdAt
+        self.likes = likes
+        self.familyCode = familyCode
+    }
 }

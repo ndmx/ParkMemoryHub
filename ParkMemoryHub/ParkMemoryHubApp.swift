@@ -8,12 +8,19 @@
 import SwiftUI
 import FirebaseCore
 import BackgroundTasks
+import FirebaseAppCheck
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         print("🚀 Configuring Firebase...")
         FirebaseApp.configure()
+        // Enable Firebase App Check
+        #if DEBUG
+        AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
+        #else
+        AppCheck.setAppCheckProviderFactory(AppAttestProviderFactory())
+        #endif
         print("✅ Firebase configured successfully!")
         
         // Test Firebase services
@@ -50,6 +57,7 @@ struct ParkMemoryHubApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(\.font, .system(.body, design: .rounded))
         }
     }
 }

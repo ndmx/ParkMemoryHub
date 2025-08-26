@@ -8,6 +8,13 @@ struct Theme {
     static let warningColor = Color("WarningOrange")
     static let errorColor = Color("ErrorRed")
     
+    // Brand palette per design prompt
+    static let brandPrimaryGreen = Color(red: 0.298, green: 0.686, blue: 0.314) // #4CAF50
+    static let brandSecondaryOrange = Color(red: 1.0, green: 0.596, blue: 0.0)   // #FF9800
+    static let brandDeleteRed = Color(red: 1.0, green: 0.0, blue: 0.0)           // #FF0000
+    static let brandTextDark = Color(red: 0.2, green: 0.2, blue: 0.2)            // #333333
+    static let brandTextLight = Color(red: 0.878, green: 0.878, blue: 0.878)     // #E0E0E0
+    
     // MARK: - Background Colors
     static let backgroundPrimary = Color(.systemBackground)
     static let backgroundSecondary = Color(.secondarySystemBackground)
@@ -63,7 +70,7 @@ struct Theme {
     static let animationFast = Animation.easeInOut(duration: 0.2)
     static let animationMedium = Animation.easeInOut(duration: 0.3)
     static let animationSlow = Animation.easeInOut(duration: 0.5)
-    static let springAnimation = Animation.spring(response: 0.3, dampingFraction: 0.6)
+    static let springAnimation = Animation.spring(response: 0.3, dampingFraction: 0.8)
     
     // MARK: - iOS 18 Enhanced Animations
     @available(iOS 18.0, *)
@@ -188,4 +195,64 @@ extension View {
 
 enum ShadowSize {
     case small, medium, large
+}
+
+// MARK: - Rounded helpers and utilities
+extension View {
+    /// Applies standard padding, subtle background and 16pt corner radius with small shadow
+    func roundedCard(
+        padding: CGFloat = Theme.spacingM,
+        backgroundColor: Color? = nil,
+        cornerRadius: CGFloat = Theme.cornerRadiusL,
+        addShadow: Bool = true
+    ) -> some View {
+        let bg = backgroundColor ?? Theme.backgroundSecondary.opacity(0.6)
+        return self
+            .padding(padding)
+            .background(bg, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .if(addShadow) { view in
+                view.themeShadow(.small)
+            }
+    }
+    
+    /// Standardized text field background with padding and rounded corners
+    func themedFormFieldBackground(cornerRadius: CGFloat = Theme.cornerRadiusL) -> some View {
+        self
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.white.opacity(0.1))
+            )
+    }
+    
+    /// Primary action gradient background per spec (orange -> yellow)
+    func primaryActionBackground(cornerRadius: CGFloat = Theme.cornerRadiusL) -> some View {
+        self
+            .background(
+                LinearGradient(
+                    colors: [Theme.brandSecondaryOrange, Color.yellow],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ), in: RoundedRectangle(cornerRadius: cornerRadius)
+            )
+    }
+    
+    /// Delete swipe rounded red background helper
+    func deleteSwipeBackground(cornerRadius: CGFloat = Theme.cornerRadiusL) -> some View {
+        self
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Theme.brandDeleteRed))
+    }
+    
+    /// Convenience spring animation used for interactive elements
+    func springy() -> some View { self.animation(Theme.springAnimation, value: UUID()) }
+}
+
+// Conditional modifier utility
+extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition { transform(self) } else { self }
+    }
 }

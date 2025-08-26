@@ -30,7 +30,7 @@ struct MediaDetailView: View {
                     }
                     .frame(maxHeight: 400)
                     .clipped()
-                    .cornerRadius(12)
+                    .cornerRadius(Theme.cornerRadiusL)
                     
                     VStack(alignment: .leading, spacing: 16) {
                         // Header info
@@ -127,7 +127,7 @@ struct MediaDetailView: View {
                             }
                             .padding()
                             .background(Color(.systemGray6))
-                            .cornerRadius(12)
+                            .cornerRadius(16)
                         }
                         
                         // Frame theme
@@ -144,7 +144,7 @@ struct MediaDetailView: View {
                             }
                             .padding()
                             .background(Color(.systemGray6))
-                            .cornerRadius(12)
+                            .cornerRadius(16)
                         }
                         
                         // Tags
@@ -199,7 +199,7 @@ struct MediaDetailView: View {
                             }
                             .padding()
                             .background(Color(.systemGray6))
-                            .cornerRadius(12)
+                            .cornerRadius(16)
                         }
                     }
                     .padding(.horizontal)

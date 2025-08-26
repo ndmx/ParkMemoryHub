@@ -20,6 +20,7 @@ struct CaptureView: View {
     @State private var showAlert = false
     @State private var alertMessage = ""
     @State private var locationInfo: MediaItem.LocationInfo?
+    @State private var overlayOffset: CGSize = .zero
     
     // iOS 18 Camera Enhancement States
     @State private var isDepthSensingEnabled = false
@@ -87,29 +88,53 @@ struct CaptureView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                // Image Preview
-                if let processedImage = processedImage {
-                    Image(uiImage: processedImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: 400)
-                        .cornerRadius(12)
-                        .shadow(radius: 5)
-                } else {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: 400)
-                        .overlay(
-                            VStack(spacing: 16) {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(.gray)
-                                
-                                Text("Select or take a photo")
-                                    .font(.headline)
-                                    .foregroundColor(.gray)
-                            }
-                        )
+                // Image Preview + movable caption overlay
+                ZStack(alignment: .bottom) {
+                    if let processedImage = processedImage {
+                        Image(uiImage: processedImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: 400)
+                            .cornerRadius(Theme.cornerRadiusL)
+                            .themeShadow(.small)
+                    } else {
+                        RoundedRectangle(cornerRadius: Theme.cornerRadiusL)
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 400)
+                            .overlay(
+                                VStack(spacing: 16) {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 60))
+                                        .foregroundColor(.gray)
+                                    
+                                    Text("Select or take a photo")
+                                        .font(.headline)
+                                        .foregroundColor(.gray)
+                                }
+                            )
+                    }
+                    // Movable caption overlay (15px above bottom by default)
+                    if !caption.isEmpty {
+                        Text(caption)
+                            .font(.system(.title3, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.black.opacity(0.5))
+                            )
+                            .offset(overlayOffset)
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        overlayOffset = value.translation.applying(.init(translationX: 0, y: -15))
+                                    }
+                            )
+                            .padding(.bottom, 15)
+                    }
                 }
                 
                 // Enhanced Capture Buttons with iOS 18 Styling
@@ -295,15 +320,10 @@ struct CaptureView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             TextField("Share your park memories...", text: $caption, axis: .vertical)
                                 .textFieldStyle(.plain)
-                                .padding()
-                                .background {
-                                    RoundedRectangle(cornerRadius: Theme.cornerRadiusM)
-                                        .fill(Theme.backgroundSecondary)
-                                        .stroke(Theme.primaryColor.opacity(0.3), lineWidth: 1)
-                                }
+                                .themedFormFieldBackground(cornerRadius: Theme.cornerRadiusL)
                                 .lineLimit(2...8)
                                 .font(.body)
-                                .animation(.easeInOut(duration: 0.2), value: caption.count)
+                                .animation(Theme.animationFast, value: caption.count)
                                 .padding(.horizontal)
                             
                             // Character Count and Suggestions
@@ -377,10 +397,9 @@ struct CaptureView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                        .padding(.vertical, 16)
+                        .foregroundStyle(.white)
+                        .primaryActionBackground()
                         .padding(.horizontal)
                     }
                     .disabled(isProcessing)
@@ -414,8 +433,10 @@ struct CaptureView: View {
         }
         .onChange(of: selectedImage) { oldValue, newValue in
             if let image = newValue {
-                processedImage = image
+                processedImage = image.orientationFixed()
                 selectedFilter = .none
+                // Reset movable caption overlay to default (15px above bottom)
+                overlayOffset = .zero
             }
         }
         .alert("Upload Result", isPresented: $showAlert) {
@@ -438,7 +459,7 @@ struct CaptureView: View {
             return
         }
         
-        guard let ciImage = CIImage(image: image) else { return }
+        guard let ciImage = CIImage(image: image.orientationFixed()) else { return }
         let context = CIContext()
         
         var outputImage = ciImage
@@ -527,7 +548,7 @@ struct CaptureView: View {
         }
         
         if let cgImage = context.createCGImage(outputImage, from: outputImage.extent) {
-            processedImage = UIImage(cgImage: cgImage)
+            processedImage = UIImage(cgImage: cgImage).orientationFixed()
         }
     }
     
@@ -704,6 +725,18 @@ struct CameraView: UIViewControllerRepresentable {
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             picker.dismiss(animated: true)
         }
+    }
+}
+
+// MARK: - UIImage Orientation Helper
+fileprivate extension UIImage {
+    func orientationFixed() -> UIImage {
+        if imageOrientation == .up { return self }
+        UIGraphicsBeginImageContextWithOptions(size, false, scale)
+        draw(in: CGRect(origin: .zero, size: size))
+        let normalizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return normalizedImage ?? self
     }
 }
 

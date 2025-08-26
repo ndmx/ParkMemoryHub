@@ -94,7 +94,6 @@ class FirebaseService: ObservableObject {
             "username": profile.username,
             "email": profile.email,
             "avatarURL": profile.avatarURL ?? "",
-            "isKidMode": profile.isKidMode,
             "familyCode": profile.familyCode,
             "shareLocation": profile.shareLocation,
             "shareMedia": profile.shareMedia,
@@ -117,7 +116,6 @@ class FirebaseService: ObservableObject {
             username: data["username"] as? String ?? "",
             email: data["email"] as? String ?? "",
             avatarURL: data["avatarURL"] as? String,
-            isKidMode: data["isKidMode"] as? Bool ?? false,
             familyCode: data["familyCode"] as? String ?? "",
             shareLocation: data["shareLocation"] as? Bool ?? true,
             shareMedia: data["shareMedia"] as? Bool ?? true,
@@ -144,7 +142,6 @@ class FirebaseService: ObservableObject {
                 username: data["username"] as? String ?? "",
                 email: data["email"] as? String ?? "",
                 avatarURL: data["avatarURL"] as? String,
-                isKidMode: data["isKidMode"] as? Bool ?? false,
                 familyCode: data["familyCode"] as? String ?? "",
                 shareLocation: data["shareLocation"] as? Bool ?? true,
                 shareMedia: data["shareMedia"] as? Bool ?? true,
@@ -229,7 +226,8 @@ class FirebaseService: ObservableObject {
             "tags": item.tags,
             "appliedFilter": item.appliedFilter ?? "",
             "frameTheme": item.frameTheme ?? "",
-            "createdAt": item.createdAt,
+            // Use server-side timestamp to avoid client clock skew
+            "createdAt": FieldValue.serverTimestamp(),
             "likes": item.likes,
             "familyCode": item.familyCode
         ])
@@ -255,7 +253,9 @@ class FirebaseService: ObservableObject {
                 )
             }
             
-            var item = MediaItem(
+            let createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+            let likes = data["likes"] as? [String] ?? []
+            return MediaItem(
                 id: document.documentID,
                 userId: data["userId"] as? String ?? "",
                 username: data["username"] as? String ?? "",
@@ -265,12 +265,11 @@ class FirebaseService: ObservableObject {
                 location: location,
                 tags: data["tags"] as? [String] ?? [],
                 appliedFilter: data["appliedFilter"] as? String,
-                frameTheme: data["frameTheme"] as? String
+                frameTheme: data["frameTheme"] as? String,
+                familyCode: data["familyCode"] as? String ?? "",
+                createdAt: createdAt,
+                likes: likes
             )
-            // Persist likes from Firestore
-            let likes = data["likes"] as? [String] ?? []
-            item.likes = likes
-            return item
         }
     }
     
@@ -289,7 +288,8 @@ class FirebaseService: ObservableObject {
             "scheduledTime": activity.scheduledTime as Any,
             "createdBy": activity.createdBy,
             "familyCode": activity.familyCode,
-            "createdAt": activity.createdAt,
+            // Use server-side timestamp
+            "createdAt": FieldValue.serverTimestamp(),
             "votes": activity.votes.mapValues { $0.rawValue },
             "status": activity.status.rawValue
         ])
@@ -388,7 +388,8 @@ class FirebaseService: ObservableObject {
                 createdBy: createdBy,
                 familyCode: familyCode,
                 votes: parsedVotes,
-                status: status
+                status: status,
+                createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
             )
         }
     }

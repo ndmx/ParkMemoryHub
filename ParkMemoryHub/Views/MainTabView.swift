@@ -14,8 +14,13 @@ struct MainTabView: View {
                 AlbumView()
             }
             .tabItem {
-                Image(systemName: "photo.on.rectangle.angled")
-                Text("Memories")
+                Label {
+                    Text("Memories")
+                } icon: {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 28, weight: .medium, design: .rounded))
+                }
             }
             .badge(unreadMediaCount > 0 ? unreadMediaCount : 0)
             .tag(0)
@@ -25,8 +30,13 @@ struct MainTabView: View {
                 RadarView()
             }
             .tabItem {
-                Image(systemName: "location.circle")
-                Text("Radar")
+                Label {
+                    Text("Radar")
+                } icon: {
+                    Image(systemName: "location.circle")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 28, weight: .medium, design: .rounded))
+                }
             }
             .badge(notificationCount > 0 ? notificationCount : 0)
             .tag(1)
@@ -36,8 +46,13 @@ struct MainTabView: View {
                 PlannerView()
             }
             .tabItem {
-                Image(systemName: "calendar.badge.plus")
-                Text("Planner")
+                Label {
+                    Text("Planner")
+                } icon: {
+                    Image(systemName: "calendar.badge.plus")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 28, weight: .medium, design: .rounded))
+                }
             }
             .badge(pendingActivitiesCount > 0 ? pendingActivitiesCount : 0)
             .tag(2)
@@ -47,12 +62,18 @@ struct MainTabView: View {
                 ProfileView()
             }
             .tabItem {
-                Image(systemName: "person.circle")
-                Text("Profile")
+                Label {
+                    Text("Profile")
+                } icon: {
+                    Image(systemName: "person.circle")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 28, weight: .medium, design: .rounded))
+                }
             }
             .tag(3)
         }
         .accentColor(Theme.primaryColor)
+        .tabViewStyle(.automatic)
         .animation(.snappy(duration: 0.3), value: selectedTab)
         .onAppear {
             setupTabBarAppearance()

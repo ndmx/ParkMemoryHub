@@ -60,21 +60,35 @@ struct RadarView: View {
             if let currentUser = currentUserProfile,
                let location = locationManager.currentLocation {
                 Annotation(currentUser.username, coordinate: location.coordinate) {
-                    ProfileLocationAnnotation(user: currentUser, isCurrentUser: true)
+                    VStack(spacing: 4) {
+                        ProfileLocationAnnotation(user: currentUser, isCurrentUser: true)
+                        Text(locationName(for: location))
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
                 }
             }
             
             // Family member annotations with profile pictures
             ForEach(familyMembers) { member in
                 Annotation(member.username, coordinate: getMemberLocation(member)) {
-                    ProfileLocationAnnotation(user: member, isCurrentUser: false)
-                        .onTapGesture {
-                            selectedMember = member
-                        }
+                    VStack(spacing: 4) {
+                        ProfileLocationAnnotation(user: member, isCurrentUser: false)
+                            .onTapGesture { selectedMember = member }
+                        Text(memberLocationText(member))
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
                 }
             }
         }
-        .ignoresSafeArea(edges: .bottom)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusL))
+        .themeShadow(.medium)
+        .padding(.horizontal, Theme.spacingM)
     }
 
     private var mapOverlays: some View {
@@ -127,10 +141,10 @@ struct RadarView: View {
                     Image(systemName: "location.slash.fill")
                     Text("Enable Location Access")
                 }
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(10)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .foregroundStyle(.white)
+                .primaryActionBackground()
             }
             .padding(.bottom, 100)
         }
@@ -182,7 +196,8 @@ struct RadarView: View {
                     ForEach(familyMembers) { member in
                         FamilyMemberCard(
                             member: member,
-                            onPing: { pingMember(member) }
+                            onPing: { pingMember(member) },
+                            onSelect: { zoomToMember(member) }
                         )
                         .offset(y: isVisible ? 0 : 20)
                         .opacity(isVisible ? 1 : 0)
@@ -196,6 +211,12 @@ struct RadarView: View {
                 .padding(.horizontal, Theme.spacingM)
             }
             .padding(.vertical, Theme.spacingM)
+            .overlay(alignment: .topLeading) {
+                Text("\(familyMembers.count) family members visible")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, Theme.spacingM)
+            }
         }
         .background(Theme.backgroundPrimary)
         .glassmorphism(material: Theme.glassmorphismThin, cornerRadius: Theme.cornerRadiusL)
@@ -410,6 +431,16 @@ struct RadarView: View {
         }
     }
 }
+// MARK: - Helpers
+extension RadarView {
+    private func locationName(for location: CLLocation) -> String {
+        locationManager.currentPark ?? "N/A"
+    }
+    private func memberLocationText(_ member: UserProfile) -> String {
+        // Placeholder using park; real app would map member id to location text
+        locationManager.currentPark ?? "N/A"
+    }
+}
 
 struct MemberAnnotationView: View {
     let member: UserProfile
@@ -451,6 +482,7 @@ struct MemberAnnotationView: View {
 struct FamilyMemberCard: View {
     let member: UserProfile
     let onPing: () -> Void
+    let onSelect: () -> Void
     @State private var isPressed = false
     
     // Different colors for different family members
@@ -515,6 +547,10 @@ struct FamilyMemberCard: View {
         .themeShadow(.small)
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .animation(Theme.springAnimation, value: isPressed)
+        .onTapGesture {
+            HapticManager.shared.lightTap()
+            onSelect()
+        }
     }
 }
 
@@ -590,6 +626,18 @@ struct MemberDetailView: View {
     }
 }
 
+// MARK: - Map Zoom Helper
+extension RadarView {
+    private func zoomToMember(_ member: UserProfile) {
+        let coord = getMemberLocation(member)
+        withAnimation(.easeInOut(duration: 0.6)) {
+            mapPosition = .region(MKCoordinateRegion(
+                center: coord,
+                span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
+            ))
+        }
+    }
+}
 #Preview {
     RadarView()
         .environmentObject(FirebaseService.shared)

@@ -16,7 +16,7 @@ struct AuthView: View {
             ZStack {
                 // Background gradient
                 LinearGradient(
-                    colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
+                    colors: [Theme.brandPrimaryGreen.opacity(0.25), Theme.brandSecondaryOrange.opacity(0.25)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -27,40 +27,44 @@ struct AuthView: View {
                     VStack(spacing: 20) {
                         Image(systemName: "camera.circle.fill")
                             .font(.system(size: 80))
-                            .foregroundColor(.white)
-                            .scaleEffect(isSignUp ? 1.1 : 1.0)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isSignUp)
+                            .foregroundStyle(.white)
+                            .scaleEffect(isSignUp ? 1.05 : 1.0)
+                            .animation(Theme.springAnimation, value: isSignUp)
                         
                         Text("ParkMemory Hub")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                         
                         Text("Share memories with your family")
                             .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundStyle(.white.opacity(0.85))
                     }
                     
-                    // Form
-                    VStack(spacing: 20) {
+                    // Form container with rounded card styling
+                    VStack(spacing: 16) {
                         if isSignUp {
                             TextField("Username", text: $username)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .textFieldStyle(.plain)
+                                .themedFormFieldBackground()
                                 .autocapitalization(.none)
                         }
                         
                         TextField("Email", text: $email)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .textFieldStyle(.plain)
                             .keyboardType(.emailAddress)
                             .autocapitalization(.none)
+                            .themedFormFieldBackground()
                         
                         SecureField("Password", text: $password)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .textFieldStyle(.plain)
+                            .themedFormFieldBackground()
                         
                         if isSignUp {
                             TextField("Family Code", text: $familyCode)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .textFieldStyle(.plain)
                                 .autocapitalization(.none)
+                                .themedFormFieldBackground()
                         }
                         
                         // Action Button
@@ -76,26 +80,27 @@ struct AuthView: View {
                                 }
                             }
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.white)
-                            .foregroundColor(.blue)
-                            .cornerRadius(10)
+                            .padding(.vertical, 16)
+                            .foregroundStyle(.white)
+                            .primaryActionBackground()
                         }
                         .disabled(isLoading || !isValidInput)
+                        .springy()
                         
                         // Toggle Button
                         Button(action: { 
-                            withAnimation(.spring()) {
+                            withAnimation(Theme.springAnimation) {
                                 isSignUp.toggle()
                                 errorMessage = ""
                             }
                         }) {
                             Text(isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
-                                .foregroundColor(.white)
+                                .foregroundStyle(.white)
                                 .underline()
                         }
                     }
-                    .padding(.horizontal, 30)
+                    .roundedCard(padding: 24, backgroundColor: Theme.brandPrimaryGreen.opacity(0.05))
+                    .padding(.horizontal, 20)
                     
                     Spacer()
                 }
