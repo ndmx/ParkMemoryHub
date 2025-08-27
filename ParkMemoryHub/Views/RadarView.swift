@@ -24,6 +24,7 @@ struct RadarView: View {
     @State private var isVisible = false
     @State private var memberLocations: [String: CLLocationCoordinate2D] = [:]
     @State private var currentUserProfile: UserProfile?
+    @State private var selectedMemberForZoom: String? = nil
     
     // MARK: - Sub-Views for Complex Expression Breaking
 
@@ -71,8 +72,8 @@ struct RadarView: View {
                 }
             }
             
-            // Family member annotations with profile pictures
-            ForEach(familyMembers) { member in
+            // Family member annotations with profile pictures (only for those sharing location)
+            ForEach(familyMembers.filter { $0.shareLocation }) { member in
                 Annotation(member.username, coordinate: getMemberLocation(member)) {
                     VStack(spacing: 4) {
                         ProfileLocationAnnotation(user: member, isCurrentUser: false)
@@ -187,6 +188,37 @@ struct RadarView: View {
         }
     }
 
+    private var familyMemberListSection: some View {
+        VStack(spacing: 0) {
+            if familyMembers.isEmpty {
+                emptyMemberListView
+            } else {
+                familyMemberList
+            }
+        }
+    }
+    
+    private var emptyMemberListView: some View {
+        VStack(spacing: Theme.spacingM) {
+            Image(systemName: "person.3.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.gray)
+            
+            Text("No family members found")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            Text("Invite family members to see their locations here")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(Theme.spacingL)
+        .background(Theme.backgroundPrimary)
+        .glassmorphism(material: Theme.glassmorphismThin, cornerRadius: Theme.cornerRadiusL)
+        .themeShadow(.medium)
+    }
+
     private var familyMemberList: some View {
         VStack(spacing: 0) {
             Divider()
@@ -196,8 +228,12 @@ struct RadarView: View {
                     ForEach(familyMembers) { member in
                         FamilyMemberCard(
                             member: member,
+                            isSelected: selectedMemberForZoom == member.id,
                             onPing: { pingMember(member) },
-                            onSelect: { zoomToMember(member) }
+                            onSelect: { 
+                                selectedMemberForZoom = member.id
+                                zoomToMember(member) 
+                            }
                         )
                         .offset(y: isVisible ? 0 : 20)
                         .opacity(isVisible ? 1 : 0)
@@ -212,7 +248,8 @@ struct RadarView: View {
             }
             .padding(.vertical, Theme.spacingM)
             .overlay(alignment: .topLeading) {
-                Text("\(familyMembers.count) family members visible")
+                let sharingCount = familyMembers.filter { $0.shareLocation }.count
+                Text("\(familyMembers.count) family members (\(sharingCount) sharing location)")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.horizontal, Theme.spacingM)
@@ -228,10 +265,8 @@ struct RadarView: View {
             headerView
             mapSection
 
-            // Family member list with bottom sheet
-            if !familyMembers.isEmpty {
-                familyMemberList
-            }
+            // Family member list with bottom sheet (always show)
+            familyMemberListSection
         }
         .navigationTitle("")
         .toolbar(.hidden, for: .navigationBar)
@@ -307,11 +342,12 @@ struct RadarView: View {
                 print("✅ RadarView: Found \(members.count) family members")
                 
                 DispatchQueue.main.async {
-                    // Filter members based on privacy settings and exclude current user
+                    // Show all family members (excluding current user) and let them control their own location sharing
                     self.familyMembers = members.filter { 
-                        $0.shareLocation && $0.id != firebaseService.currentUser?.uid 
+                        $0.id != firebaseService.currentUser?.uid 
                     }
-                    print("📍 RadarView: \(self.familyMembers.count) members sharing location")
+                    let sharingLocationCount = members.filter { $0.shareLocation && $0.id != firebaseService.currentUser?.uid }.count
+                    print("📍 RadarView: \(self.familyMembers.count) total members, \(sharingLocationCount) sharing location")
                 }
             } catch {
                 print("❌ RadarView: Error loading family members: \(error)")
@@ -481,6 +517,7 @@ struct MemberAnnotationView: View {
 
 struct FamilyMemberCard: View {
     let member: UserProfile
+    let isSelected: Bool
     let onPing: () -> Void
     let onSelect: () -> Void
     @State private var isPressed = false
@@ -511,6 +548,25 @@ struct FamilyMemberCard: View {
             .frame(width: 55, height: 55)
             .clipShape(Circle())
             .overlay(Circle().stroke(memberColor, lineWidth: 3))
+            .overlay(
+                // Location sharing indicator
+                Group {
+                    if member.shareLocation {
+                        Image(systemName: "location.fill")
+                            .font(.caption2)
+                            .foregroundColor(.white)
+                            .padding(4)
+                            .background(Color.green, in: Circle())
+                    } else {
+                        Image(systemName: "location.slash")
+                            .font(.caption2)
+                            .foregroundColor(.white)
+                            .padding(4)
+                            .background(Color.gray, in: Circle())
+                    }
+                }
+                .offset(x: 20, y: -20)
+            )
             .themeShadow(.small)
             
             Text(member.username)
@@ -542,11 +598,16 @@ struct FamilyMemberCard: View {
         }
         .frame(width: 85)
         .padding(.vertical, Theme.spacingS)
-        .background(Theme.backgroundSecondary)
+        .background(isSelected ? memberColor.opacity(0.2) : Theme.backgroundSecondary)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cornerRadiusM)
+                .stroke(isSelected ? memberColor : Color.clear, lineWidth: 2)
+        )
         .cornerRadius(Theme.cornerRadiusM)
-        .themeShadow(.small)
-        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .themeShadow(isSelected ? .medium : .small)
+        .scaleEffect(isPressed ? 0.95 : (isSelected ? 1.05 : 1.0))
         .animation(Theme.springAnimation, value: isPressed)
+        .animation(Theme.springAnimation, value: isSelected)
         .onTapGesture {
             HapticManager.shared.lightTap()
             onSelect()
