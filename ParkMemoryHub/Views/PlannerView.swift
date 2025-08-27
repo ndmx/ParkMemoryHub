@@ -106,11 +106,13 @@ struct PlannerView: View {
                                 } label: {
                                     HStack {
                                         Image(systemName: "trash")
+                                            .foregroundStyle(.white)
                                         Text("Delete")
+                                            .foregroundStyle(.white)
                                     }
                                     .deleteSwipeBackground()
                                 }
-                                .tint(.clear)
+                                .tint(.red)
                             }
                         }
                     }
@@ -337,10 +339,10 @@ struct ActivityCard: View {
                             Text(scheduledTime, style: .time)
                                 .font(.caption)
                                 .foregroundColor(isTimePast(scheduledTime) ? .red : .secondary)
+                            Text(formattedScheduledDate())
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
                         }
-                        Text(formattedCreationTime())
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
                     }
                 }
                 
@@ -429,10 +431,12 @@ struct ActivityCard: View {
     private func isTimePast(_ time: Date) -> Bool {
         return time < Date()
     }
-    private func formattedCreationTime() -> String {
+    private func formattedScheduledDate() -> String {
+        guard let scheduledTime = activity.scheduledTime else { return "" }
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE HH:mm"
-        return formatter.string(from: activity.createdAt)
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: scheduledTime)
     }
 }
 

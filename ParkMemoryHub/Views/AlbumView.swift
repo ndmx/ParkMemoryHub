@@ -113,11 +113,13 @@ struct AlbumView: View {
                                 } label: {
                                     HStack {
                                         Image(systemName: "trash")
+                                            .foregroundStyle(.white)
                                         Text("Delete")
+                                            .foregroundStyle(.white)
                                     }
                                     .deleteSwipeBackground()
                                 }
-                                .tint(.clear)
+                                .tint(.red)
                             }
                         }
                     }
@@ -320,7 +322,7 @@ struct MediaItemCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.and.ellipse")
                             .font(.caption)
-                        Text(item.location?.parkName?.isEmpty == false ? (item.location?.parkName ?? "") : "N/A")
+                        Text(locationDisplayText())
                             .font(.caption)
                     }
                     .foregroundStyle(.white.opacity(0.9))
@@ -373,6 +375,16 @@ struct MediaItemCard: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE HH:mm" // e.g., "Saturday 14:47"
         return formatter.string(from: item.createdAt)
+    }
+
+    private func locationDisplayText() -> String {
+        if let park = item.location?.parkName, !park.isEmpty {
+            return park
+        }
+        if let ride = item.location?.rideName, !ride.isEmpty {
+            return ride
+        }
+        return "N/A"
     }
 }
 

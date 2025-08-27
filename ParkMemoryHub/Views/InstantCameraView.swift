@@ -805,7 +805,10 @@ struct CapturedImageUploadView: View {
     let username: String
     let onDismiss: () -> Void
     @StateObject private var firebaseService = FirebaseService.shared
+    @StateObject private var locationManager = LocationManager.shared
     @State private var caption = ""
+    @State private var shareLocation: Bool = true
+    @State private var locationInfo: MediaItem.LocationInfo?
     @State private var isUploading = false
     @State private var showAlert = false
     @State private var alertMessage = ""
@@ -830,6 +833,30 @@ struct CapturedImageUploadView: View {
                     TextField("What's happening?", text: $caption, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(3...6)
+                }
+                .padding(.horizontal)
+
+                // Share location toggle + preview
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle(isOn: $shareLocation) {
+                        Text("Share location")
+                            .font(.headline)
+                    }
+                    if shareLocation, let info = locationInfo {
+                        HStack(spacing: 6) {
+                            Image(systemName: "location.fill").foregroundStyle(.blue)
+                            if let park = info.parkName, !park.isEmpty {
+                                Text(park).font(.subheadline).fontWeight(.semibold)
+                            }
+                            if let ride = info.rideName, !ride.isEmpty {
+                                Text(ride).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    } else if !shareLocation {
+                        Text("Location will not be shared for this memory.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.horizontal)
                 
@@ -895,6 +922,11 @@ struct CapturedImageUploadView: View {
                 }
             }
         }
+        .task {
+            locationManager.requestLocationPermission()
+            locationManager.startLocationUpdates()
+            locationInfo = await locationManager.getLocationInfo()
+        }
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(items: [image])
         }
@@ -924,7 +956,7 @@ struct CapturedImageUploadView: View {
                     userId: firebaseService.currentUser?.uid ?? "",
                     username: username,
                     caption: caption.isEmpty ? nil : caption,
-                    location: nil,
+                    location: shareLocation ? locationInfo : nil,
                     tags: [],
                     appliedFilter: nil,
                     frameTheme: nil

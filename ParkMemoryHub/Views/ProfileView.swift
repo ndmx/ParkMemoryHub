@@ -97,7 +97,7 @@ struct ProfileView: View {
                             ProfileInfoRow(
                                 icon: "calendar",
                                 title: "Member Since",
-                                value: userProfile?.createdAt.formatted(date: .abbreviated, time: .omitted) ?? "Unknown"
+                                value: firebaseService.currentUser?.metadata.creationDate?.formatted(date: .abbreviated, time: .omitted) ?? "Unknown"
                             )
 
                             ProfileInfoRow(
