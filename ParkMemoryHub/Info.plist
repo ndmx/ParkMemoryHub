@@ -39,7 +39,7 @@
     <array>
         <string>location</string>
         <string>remote-notification</string>
-        <string>background-processing</string>
+        <string>processing</string>
     </array>
     
     <!-- Background Task Scheduler Identifiers -->
