@@ -260,7 +260,7 @@ struct ProfileView: View {
         }
     }
 
-    // Kid Mode removed
+    // Removed legacy Kid Mode
 
     private func signOut() {
         do {

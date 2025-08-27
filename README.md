@@ -9,7 +9,6 @@ A family-oriented iOS app designed for group trips. Capture and share memories w
 - **MemoryMingle**: Shared photo album with real-time syncing
 - **ReuniteRadar**: Location tracking and family member pinging
 - **ParkSync**: Activity planning with group voting
-// Removed Kid Mode feature. The app supports accessibility via Dynamic Type, VoiceOver, and high-contrast colors.
 
 ### 🔐 Authentication & Profiles
 - Email/password signup and login
