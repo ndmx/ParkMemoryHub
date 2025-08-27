@@ -6,7 +6,6 @@ struct UserProfile: Identifiable, Codable, Equatable {
     let username: String
     let email: String
     var avatarURL: String?
-    let isKidMode: Bool
     let familyCode: String
     let shareLocation: Bool
     let shareMedia: Bool
@@ -19,7 +18,7 @@ struct UserProfile: Identifiable, Codable, Equatable {
     let locationUpdates: Bool
     
     init(id: String, username: String, email: String, avatarURL: String? = nil,
-         isKidMode: Bool = false, familyCode: String, shareLocation: Bool = true,
+         familyCode: String, shareLocation: Bool = true,
          shareMedia: Bool = true, shareProfile: Bool = true,
          activityNotifications: Bool = true, mediaNotifications: Bool = true,
          pingNotifications: Bool = true, locationUpdates: Bool = true) {
@@ -27,7 +26,6 @@ struct UserProfile: Identifiable, Codable, Equatable {
         self.username = username
         self.email = email
         self.avatarURL = avatarURL
-        self.isKidMode = isKidMode
         self.familyCode = familyCode
         self.shareLocation = shareLocation
         self.shareMedia = shareMedia
@@ -41,7 +39,7 @@ struct UserProfile: Identifiable, Codable, Equatable {
     }
     
     // Custom initializer for creating from Firestore data
-    init(id: String, username: String, email: String, avatarURL: String?, isKidMode: Bool,
+    init(id: String, username: String, email: String, avatarURL: String?,
          familyCode: String, shareLocation: Bool, shareMedia: Bool, shareProfile: Bool,
          createdAt: Date, lastActive: Date,
          activityNotifications: Bool = true, mediaNotifications: Bool = true,
@@ -50,7 +48,6 @@ struct UserProfile: Identifiable, Codable, Equatable {
         self.username = username
         self.email = email
         self.avatarURL = avatarURL
-        self.isKidMode = isKidMode
         self.familyCode = familyCode
         self.shareLocation = shareLocation
         self.shareMedia = shareMedia
@@ -68,7 +65,6 @@ struct UserProfile: Identifiable, Codable, Equatable {
         case username
         case email
         case avatarURL
-        case isKidMode
         case familyCode
         case shareLocation
         case shareMedia
