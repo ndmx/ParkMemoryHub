@@ -33,14 +33,6 @@
     <array>
         <dict>
             <key>NSPrivacyAccessedAPIType</key>
-            <string>NSPrivacyAccessedAPICategoryLocation</string>
-            <key>NSPrivacyAccessedAPITypeReasons</key>
-            <array>
-                <string>DDA9.1</string>
-            </array>
-        </dict>
-        <dict>
-            <key>NSPrivacyAccessedAPIType</key>
             <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
             <key>NSPrivacyAccessedAPITypeReasons</key>
             <array>
