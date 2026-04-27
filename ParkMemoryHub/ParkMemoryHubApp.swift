@@ -6,50 +6,12 @@
 //
 
 import SwiftUI
-import FirebaseCore
-import BackgroundTasks
-
-class AppDelegate: NSObject, UIApplicationDelegate {
-    func application(_ application: UIApplication,
-                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        print("🚀 Configuring Firebase...")
-        FirebaseApp.configure()
-        print("✅ Firebase configured successfully!")
-        
-        // Test Firebase services
-        FirebaseConfigTest.testFirebaseServices()
-        
-        // Test Firebase connection after a short delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            Task {
-                await FirebaseConfigTest.testFirebaseConnection()
-            }
-        }
-        
-        // Register background tasks
-        registerBackgroundTasks()
-        
-        return true
-    }
-    
-    private func registerBackgroundTasks() {
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.parkmemoryhub.locationSync", using: nil) { task in
-            Task {
-                await LocationManager.shared.performBackgroundSync()
-                task.setTaskCompleted(success: true)
-            }
-        }
-    }
-}
 
 @main
 struct ParkMemoryHubApp: App {
-    // register app delegate for Firebase setup
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ParkHubView()
                 .environment(\.font, .system(.body, design: .rounded))
         }
     }

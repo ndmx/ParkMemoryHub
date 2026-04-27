@@ -1,168 +1,63 @@
-# ParkMemory Hub 🎢📸
+# ParkMemory Hub
 
-A family-oriented iOS app designed for group trips. Capture and share memories while coordinating with your family in real-time.
+ParkMemory Hub is an iOS app for small groups who want to collect trip memories, coordinate plans, and find each other during a park visit.
 
-## ✨ Features
+The current app is Apple-first and local-first. Each device creates its own identity and circle on first launch. People join a shared circle through an invite link or invite code, and group updates sync through CloudKit.
 
-### 🎯 Core Functionalities
+## Features
 
-- **MemoryMingle**: Shared photo album with real-time syncing
-- **ReuniteRadar**: Location tracking and family member pinging
-- **ParkSync**: Activity planning with group voting
+- Memories: create photo memories with captions, tags, and optional locations.
+- Radar: share your location with your circle and open member coordinates in Maps.
+- Planner: create plans, add optional times and places, vote as a group, and update plan status.
+- Profile: set your name and profile photo, start or join a circle, share invites, and run manual sync.
+- Sync: memories, planner updates, and radar updates sync through CloudKit, with manual iCloud sync available as a fallback.
 
-### 🔐 Authentication & Profiles
-- Email/password signup and login
-- Family group joining via shared codes
-- User profiles with customizable settings
-- Secure data with Firebase backend
+## Architecture
 
-### 📸 MemoryMingle (Photo Sharing)
-- Camera and photo library integration
-- Real-time photo sharing with family
-- Photo filters and effects
-- Location-based automatic tagging
-- Disney/Universal themed frames
-- Captions and comments
+```text
+ParkMemoryHub/
+  Core/
+    Domain/          App domain models
+    Repositories/    File-backed and in-memory persistence
+    Services/        CloudKit sync services
+  Features/
+    ParkHub/         Root tab shell and invite handling
+    Memories/        Memory list, creation, detail, and sync
+    Radar/           Member location sharing and map handoff
+    Planner/         Plans, votes, status, and sync
+    Profile/         Identity, circle invites, and settings
+```
 
-### 📍 ReuniteRadar (Location Services)
-- Real-time family member locations
-- Interactive map with park boundaries
-- Location-based pinging system
-- Privacy controls for location sharing
-- Integration with planned activities
-
-### 📅 ParkSync (Planning)
-- Create and schedule activities
-- Group voting system (Yes/Maybe/No)
-- Location-based activity suggestions
-- Real-time itinerary updates
-- Notifications for changes
-
-## 🛠️ Technical Stack
-
-- **Frontend**: SwiftUI (iOS 17+)
-- **Backend**: Firebase (Auth, Firestore, Storage)
-- **Location**: CoreLocation + MapKit
-- **Image Processing**: CoreImage filters
-- **Architecture**: MVVM with ObservableObject
-
-## 📱 Requirements
+## Requirements
 
 - iOS 18.0+
-- iPhone 14 Pro or newer (optimized)
-- Xcode 15.0+
-- Apple Developer Account (for TestFlight)
+- Xcode with iOS device support
+- Apple Developer account with iCloud/CloudKit capability enabled for `lxr.ParkMemoryHub`
 
-## 🚀 Setup Instructions
+## Build
 
-### 1. Prerequisites
-- Install [Xcode](https://apps.apple.com/us/app/xcode/id497799835) from the App Store
-- Create an [Apple Developer Account](https://developer.apple.com/) ($99/year)
-- Set up [Firebase Project](https://console.firebase.google.com/)
+Open `ParkMemoryHub.xcodeproj` in Xcode, select the `ParkMemoryHub` scheme, choose a connected iPhone, and run.
 
+From the command line:
 
-### 2. Xcode Project Setup
-1. Open `ParkMemoryHub.xcodeproj` in Xcode
-2. Add Firebase dependencies:
-   - File → Add Packages
-   - Enter: `https://github.com/firebase/firebase-ios-sdk`
-   - Select: Auth, Firestore, Storage, Database
-3. Add `GoogleService-Info.plist` to your project
-4. Set minimum iOS deployment target to 17.0
-
-### 4. Build and Run
-1. Select your target device (iPhone 14 Pro+ recommended)
-2. Press ⌘+R to build and run
-3. Grant necessary permissions when prompted
-
-## 📁 Project Structure
-
-```
-ParkMemoryHub/
-├── Models/
-│   ├── UserProfile.swift      # User data model
-│   ├── MediaItem.swift        # Photo/video model
-│   └── Activity.swift         # Planning model
-├── Services/
-│   ├── FirebaseService.swift  # Firebase operations
-│   └── LocationManager.swift  # GPS handling
-├── Views/
-│   ├── AuthView.swift         # Login/signup
-│   ├── MainTabView.swift      # Tab navigation
-│   ├── AlbumView.swift        # Memory sharing
-│   ├── CaptureView.swift      # Photo capture
-│   ├── RadarView.swift        # Location tracking
-│   ├── PlannerView.swift      # Activity planning
-│   ├── ProfileView.swift      # User settings
-│   └── MediaDetailView.swift  # Memory details
-└── Assets.xcassets/           # Images and colors
+```sh
+xcodebuild -project ParkMemoryHub.xcodeproj -scheme ParkMemoryHub -configuration Debug -destination 'generic/platform=iOS' build
 ```
 
-## 🎨 Customization
+## Sync Model
 
-### Accessibility
-The app supports Dynamic Type, VoiceOver, and high-contrast colors for inclusive use.
-- Larger touch targets
-- Colorful animations
-- Simplified navigation
-- Family-friendly icons
+- Every device has a unique `DeviceIdentity` with a unique member id and circle id.
+- Starting a new circle creates a new circle UUID.
+- Joining a circle stores the invite's circle id on that device.
+- CloudKit stores group sync events keyed by circle id.
+- Devices pull and apply only events for their current circle.
 
-### Theme Integration
-- Disney World color schemes
-- Universal Studios branding
+## Privacy
 
-## 🔒 Privacy & Security
+Location sharing is opt-in. The app stores its working data locally and uses CloudKit for circle sync. There is no third-party backend dependency in the current app.
 
-- All data is private to family groups
-- Location sharing is opt-in
-- No external data sharing
-- Firebase encryption
-- GDPR compliant
+Release prep documents:
 
-## 🐛 Troubleshooting
-
-### Common Issues
-1. **Firebase not connecting**: Check `GoogleService-Info.plist` is added
-2. **Location not working**: Verify permission settings in device
-3. **Photos not uploading**: Check Firebase Storage rules
-4. **Build errors**: Ensure iOS 17+ deployment target
-
-### Debug Tips
-- Use Xcode console for Firebase logs
-- Test on multiple simulators for group features
-- Verify network connectivity
-- Check Firebase project settings
-
-## 📈 Future Enhancements
-
-- Push notifications
-- Offline mode improvements
-- Advanced photo editing
-- Social sharing features
-- Multi-language support
-- Apple Watch companion app
-
-## 🤝 Contributing
-
-This is a personal project, but suggestions are welcome! Feel free to:
-- Report bugs
-- Suggest features
-- Improve documentation
-- Optimize performance
-
-## 📄 License
-
-This project is for personal use. Please respect Disney and Universal Studios trademarks.
-
-## 🙏 Acknowledgments
-
-- A trip toDisney World and Universal Studios for inspiration
-- Firebase team for excellent backend services
-- Apple for SwiftUI and iOS development tools
-- Family and friends for testing and feedback
-
----
-
-**Happy Park Hopping! 🎢✨**
-
-For support or questions, please refer to the in-app help section or contact through the app.
+- [Release checklist](./RELEASE_CHECKLIST.md)
+- [Privacy policy draft](./docs/PRIVACY_POLICY.md)
+- [Support page draft](./docs/SUPPORT.md)
