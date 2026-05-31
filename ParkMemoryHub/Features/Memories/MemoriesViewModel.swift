@@ -12,33 +12,20 @@ final class MemoriesViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let repository: any MemoryRepository
-    private let activitiesRepository: any ActivityRepository
     private let familyRepository: any FamilyRepository
     private let activeGroup: GroupSpace
-    private let syncEventRepository: any SyncEventRepository
-
-    private var cloudSyncCoordinator: GroupCloudSyncCoordinator {
-        GroupCloudSyncCoordinator(
-            familyRepository: familyRepository,
-            memoryRepository: repository,
-            activitiesRepository: activitiesRepository,
-            syncEventRepository: syncEventRepository,
-            activeGroup: activeGroup
-        )
-    }
+    private let circleSync: any CircleSyncing
 
     init(
         repository: any MemoryRepository,
-        activitiesRepository: any ActivityRepository,
         familyRepository: any FamilyRepository,
         activeGroup: GroupSpace,
-        syncEventRepository: any SyncEventRepository
+        circleSync: any CircleSyncing
     ) {
         self.repository = repository
-        self.activitiesRepository = activitiesRepository
         self.familyRepository = familyRepository
         self.activeGroup = activeGroup
-        self.syncEventRepository = syncEventRepository
+        self.circleSync = circleSync
     }
 
     func loadMemories() {
@@ -95,17 +82,10 @@ final class MemoriesViewModel: ObservableObject {
                 )
 
                 let savedMemory = try await repository.saveMemory(memory, mediaDataItems: mediaDataItems)
-                try await cloudSyncCoordinator.uploadMemoryMedia(for: savedMemory)
-                try await recordSyncEvent(
-                    type: .memoryUpserted,
-                    subjectID: savedMemory.id,
-                    createdByMemberID: author.id,
-                    payload: savedMemory
-                )
-                _ = try await cloudSyncCoordinator.pushPendingEvents()
+                try await circleSync.pushMemory(savedMemory)
                 memories = try await repository.listMemories()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
 
             isSaving = false
@@ -116,16 +96,10 @@ final class MemoriesViewModel: ObservableObject {
         Task {
             do {
                 try await repository.deleteMemory(id: memory.id)
-                try await recordSyncEvent(
-                    type: .memoryDeleted,
-                    subjectID: memory.id,
-                    createdByMemberID: currentMember?.id ?? memory.createdByMemberID,
-                    payload: DeletedSyncSubject(id: memory.id, deletedAt: Date())
-                )
-                _ = try await cloudSyncCoordinator.pushPendingEvents()
+                try await circleSync.deleteMemoryRemote(memory)
                 memories.removeAll { $0.id == memory.id }
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
         }
     }
@@ -139,7 +113,7 @@ final class MemoriesViewModel: ObservableObject {
             do {
                 try await refreshFromICloud(showStatus: true)
             } catch {
-                errorMessage = GroupCloudSyncErrorFormatter.message(for: error)
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
 
             isSyncingICloud = false
@@ -158,25 +132,8 @@ final class MemoriesViewModel: ObservableObject {
         return creatorNamesByID[createdByMemberID]
     }
 
-    private func recordSyncEvent<Payload: Encodable>(
-        type: GroupSyncEvent.EventType,
-        subjectID: UUID?,
-        createdByMemberID: FamilyMember.ID?,
-        payload: Payload
-    ) async throws {
-        let event = try GroupSyncEvent(
-            groupID: activeGroup.id,
-            createdByMemberID: createdByMemberID,
-            type: type,
-            subjectID: subjectID,
-            payload: payload
-        )
-
-        try await syncEventRepository.appendEvent(event)
-    }
-
     private func refreshFromICloud(showStatus: Bool) async throws {
-        let result = try await cloudSyncCoordinator.pullAndApply(currentMemberID: currentMember?.id)
+        let result = try await circleSync.refresh()
         async let loadedMemories = repository.listMemories()
         async let loadedCurrentMember = familyRepository.currentMember()
         async let loadedMembers = familyRepository.listMembers()

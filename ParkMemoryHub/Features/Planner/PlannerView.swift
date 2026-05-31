@@ -7,10 +7,9 @@ struct PlannerRoute: View {
     var body: some View {
         PlannerView(
             activitiesRepository: dependencies.activities,
-            memoryRepository: dependencies.memories,
             familyRepository: dependencies.family,
             activeGroup: dependencies.activeGroup,
-            syncEventRepository: dependencies.syncEvents
+            circleSync: dependencies.circleSync
         )
     }
 }
@@ -22,18 +21,16 @@ struct PlannerView: View {
 
     init(
         activitiesRepository: any ActivityRepository,
-        memoryRepository: any MemoryRepository,
         familyRepository: any FamilyRepository,
         activeGroup: GroupSpace,
-        syncEventRepository: any SyncEventRepository
+        circleSync: any CircleSyncing
     ) {
         _viewModel = StateObject(
             wrappedValue: PlannerViewModel(
                 activitiesRepository: activitiesRepository,
-                memoryRepository: memoryRepository,
                 familyRepository: familyRepository,
                 activeGroup: activeGroup,
-                syncEventRepository: syncEventRepository
+                circleSync: circleSync
             )
         )
     }
@@ -950,9 +947,8 @@ private extension ParkActivity.Visibility {
 
     PlannerView(
         activitiesRepository: InMemoryActivityRepository(activities: [activity]),
-        memoryRepository: InMemoryMemoryRepository(),
         familyRepository: InMemoryFamilyRepository(currentMember: current),
         activeGroup: group,
-        syncEventRepository: InMemorySyncEventRepository()
+        circleSync: NoOpCircleSync()
     )
 }

@@ -34,19 +34,10 @@
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
 
-    <!-- App Link Scheme -->
-    <key>CFBundleURLTypes</key>
-    <array>
-        <dict>
-            <key>CFBundleURLName</key>
-            <string>lxr.ParkMemoryHub</string>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>parkmemoryhub</string>
-            </array>
-        </dict>
-    </array>
-    
+    <!-- CloudKit Sharing -->
+    <key>CKSharingSupported</key>
+    <true/>
+
     <!-- Bundle Info Dictionary Version -->
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>

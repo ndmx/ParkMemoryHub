@@ -173,31 +173,3 @@ actor InMemoryPreferencesRepository: PreferencesRepository {
         self.preferences = preferences
     }
 }
-
-actor InMemorySyncEventRepository: SyncEventRepository {
-    private var events: [GroupSyncEvent.ID: GroupSyncEvent]
-
-    init(events: [GroupSyncEvent] = []) {
-        self.events = Dictionary(uniqueKeysWithValues: events.map { ($0.id, $0) })
-    }
-
-    func listEvents(groupID: GroupSpace.ID?) async throws -> [GroupSyncEvent] {
-        let filteredEvents = groupID.map { id in
-            events.values.filter { $0.groupID == id }
-        } ?? Array(events.values)
-
-        return filteredEvents.sorted { $0.createdAt < $1.createdAt }
-    }
-
-    @discardableResult
-    func appendEvent(_ event: GroupSyncEvent) async throws -> GroupSyncEvent {
-        events[event.id] = event
-        return event
-    }
-
-    func appendEvents(_ events: [GroupSyncEvent]) async throws {
-        for event in events {
-            self.events[event.id] = event
-        }
-    }
-}

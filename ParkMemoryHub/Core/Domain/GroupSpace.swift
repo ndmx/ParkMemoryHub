@@ -39,3 +39,10 @@ struct GroupSpace: Identifiable, Codable, Equatable, Sendable {
         self.updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
     }
 }
+
+extension GroupSpace {
+    /// A short, human-readable identifier for the circle (display only).
+    var groupCode: String {
+        String(id.uuidString.prefix(8)).uppercased()
+    }
+}

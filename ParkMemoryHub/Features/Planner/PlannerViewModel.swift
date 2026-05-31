@@ -12,33 +12,20 @@ final class PlannerViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let activitiesRepository: any ActivityRepository
-    private let memoryRepository: any MemoryRepository
     private let familyRepository: any FamilyRepository
     private let activeGroup: GroupSpace
-    private let syncEventRepository: any SyncEventRepository
-
-    private var cloudSyncCoordinator: GroupCloudSyncCoordinator {
-        GroupCloudSyncCoordinator(
-            familyRepository: familyRepository,
-            memoryRepository: memoryRepository,
-            activitiesRepository: activitiesRepository,
-            syncEventRepository: syncEventRepository,
-            activeGroup: activeGroup
-        )
-    }
+    private let circleSync: any CircleSyncing
 
     init(
         activitiesRepository: any ActivityRepository,
-        memoryRepository: any MemoryRepository,
         familyRepository: any FamilyRepository,
         activeGroup: GroupSpace,
-        syncEventRepository: any SyncEventRepository
+        circleSync: any CircleSyncing
     ) {
         self.activitiesRepository = activitiesRepository
-        self.memoryRepository = memoryRepository
         self.familyRepository = familyRepository
         self.activeGroup = activeGroup
-        self.syncEventRepository = syncEventRepository
+        self.circleSync = circleSync
     }
 
     func load() {
@@ -100,16 +87,10 @@ final class PlannerViewModel: ObservableObject {
                 )
 
                 let savedActivity = try await activitiesRepository.saveActivity(activity)
-                try await recordSyncEvent(
-                    type: .planUpserted,
-                    subjectID: savedActivity.id,
-                    createdByMemberID: author.id,
-                    payload: savedActivity
-                )
-                _ = try await cloudSyncCoordinator.pushPendingEvents()
+                try await circleSync.pushPlan(savedActivity)
                 activities = try await activitiesRepository.listActivities()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
         }
     }
@@ -126,16 +107,10 @@ final class PlannerViewModel: ObservableObject {
                 )
                 activities = try await activitiesRepository.listActivities()
                 if let updatedActivity = activities.first(where: { $0.id == activity.id }) {
-                    try await recordSyncEvent(
-                        type: .planUpserted,
-                        subjectID: updatedActivity.id,
-                        createdByMemberID: currentMember.id,
-                        payload: updatedActivity
-                    )
-                    _ = try await cloudSyncCoordinator.pushPendingEvents()
+                    try await circleSync.pushPlan(updatedActivity)
                 }
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
         }
     }
@@ -148,16 +123,10 @@ final class PlannerViewModel: ObservableObject {
         Task {
             do {
                 let savedActivity = try await activitiesRepository.saveActivity(updatedActivity)
-                try await recordSyncEvent(
-                    type: .planUpserted,
-                    subjectID: savedActivity.id,
-                    createdByMemberID: currentMember?.id ?? savedActivity.createdByMemberID,
-                    payload: savedActivity
-                )
-                _ = try await cloudSyncCoordinator.pushPendingEvents()
+                try await circleSync.pushPlan(savedActivity)
                 activities = try await activitiesRepository.listActivities()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
         }
     }
@@ -166,16 +135,10 @@ final class PlannerViewModel: ObservableObject {
         Task {
             do {
                 try await activitiesRepository.deleteActivity(id: activity.id)
-                try await recordSyncEvent(
-                    type: .planDeleted,
-                    subjectID: activity.id,
-                    createdByMemberID: currentMember?.id ?? activity.createdByMemberID,
-                    payload: DeletedSyncSubject(id: activity.id, deletedAt: Date())
-                )
-                _ = try await cloudSyncCoordinator.pushPendingEvents()
+                try await circleSync.deletePlanRemote(id: activity.id)
                 activities.removeAll { $0.id == activity.id }
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
         }
     }
@@ -189,7 +152,7 @@ final class PlannerViewModel: ObservableObject {
             do {
                 try await refreshFromICloud(showStatus: true)
             } catch {
-                errorMessage = GroupCloudSyncErrorFormatter.message(for: error)
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
 
             isSyncingICloud = false
@@ -208,25 +171,8 @@ final class PlannerViewModel: ObservableObject {
         return memberNamesByID[createdByMemberID]
     }
 
-    private func recordSyncEvent<Payload: Encodable>(
-        type: GroupSyncEvent.EventType,
-        subjectID: UUID?,
-        createdByMemberID: FamilyMember.ID?,
-        payload: Payload
-    ) async throws {
-        let event = try GroupSyncEvent(
-            groupID: activeGroup.id,
-            createdByMemberID: createdByMemberID,
-            type: type,
-            subjectID: subjectID,
-            payload: payload
-        )
-
-        try await syncEventRepository.appendEvent(event)
-    }
-
     private func refreshFromICloud(showStatus: Bool) async throws {
-        let result = try await cloudSyncCoordinator.pullAndApply(currentMemberID: currentMember?.id)
+        let result = try await circleSync.refresh()
         async let loadedCurrentMember = familyRepository.currentMember()
         async let loadedMembers = familyRepository.listMembers()
         async let loadedActivities = activitiesRepository.listActivities()

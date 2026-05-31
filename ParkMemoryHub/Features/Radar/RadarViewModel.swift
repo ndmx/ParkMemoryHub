@@ -9,33 +9,17 @@ final class RadarViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let familyRepository: any FamilyRepository
-    private let memoryRepository: any MemoryRepository
-    private let activitiesRepository: any ActivityRepository
-    private let syncEventRepository: any SyncEventRepository
+    private let circleSync: any CircleSyncing
     let activeGroup: GroupSpace
-
-    private var cloudSyncCoordinator: GroupCloudSyncCoordinator {
-        GroupCloudSyncCoordinator(
-            familyRepository: familyRepository,
-            memoryRepository: memoryRepository,
-            activitiesRepository: activitiesRepository,
-            syncEventRepository: syncEventRepository,
-            activeGroup: activeGroup
-        )
-    }
 
     init(
         familyRepository: any FamilyRepository,
-        memoryRepository: any MemoryRepository,
-        activitiesRepository: any ActivityRepository,
         activeGroup: GroupSpace,
-        syncEventRepository: any SyncEventRepository
+        circleSync: any CircleSyncing
     ) {
         self.familyRepository = familyRepository
-        self.memoryRepository = memoryRepository
-        self.activitiesRepository = activitiesRepository
         self.activeGroup = activeGroup
-        self.syncEventRepository = syncEventRepository
+        self.circleSync = circleSync
     }
 
     func loadMembers() {
@@ -46,10 +30,10 @@ final class RadarViewModel: ObservableObject {
             do {
                 let member = try await familyRepository.currentMember()
                 currentMember = member
-                _ = try await cloudSyncCoordinator.sync(currentMemberID: member.id)
+                _ = try await circleSync.refresh()
                 members = try await familyRepository.listMembers()
             } catch {
-                errorMessage = GroupCloudSyncErrorFormatter.message(for: error)
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
 
             isLoading = false
@@ -68,17 +52,11 @@ final class RadarViewModel: ObservableObject {
         Task {
             do {
                 let savedMember = try await familyRepository.saveMember(updatedMember)
-                try await recordSyncEvent(
-                    type: .memberProfileUpdated,
-                    subjectID: savedMember.id,
-                    createdByMemberID: savedMember.id,
-                    payload: savedMember
-                )
-                _ = try await cloudSyncCoordinator.pushPendingEvents()
+                try await circleSync.pushMember(savedMember, avatarData: nil)
                 currentMember = savedMember
                 members = try await familyRepository.listMembers()
             } catch {
-                errorMessage = GroupCloudSyncErrorFormatter.message(for: error)
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
         }
     }
@@ -97,37 +75,14 @@ final class RadarViewModel: ObservableObject {
         Task {
             do {
                 let savedMember = try await familyRepository.saveMember(member)
-                try await recordSyncEvent(
-                    type: .memberLocationUpdated,
-                    subjectID: savedMember.id,
-                    createdByMemberID: savedMember.id,
-                    payload: savedMember
-                )
-                _ = try await cloudSyncCoordinator.pushPendingEvents()
+                try await circleSync.pushMember(savedMember, avatarData: nil)
                 currentMember = savedMember
                 members = try await familyRepository.listMembers()
             } catch {
-                errorMessage = GroupCloudSyncErrorFormatter.message(for: error)
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
 
             isSavingLocation = false
         }
-    }
-
-    private func recordSyncEvent<Payload: Encodable>(
-        type: GroupSyncEvent.EventType,
-        subjectID: UUID?,
-        createdByMemberID: FamilyMember.ID?,
-        payload: Payload
-    ) async throws {
-        let event = try GroupSyncEvent(
-            groupID: activeGroup.id,
-            createdByMemberID: createdByMemberID,
-            type: type,
-            subjectID: subjectID,
-            payload: payload
-        )
-
-        try await syncEventRepository.appendEvent(event)
     }
 }

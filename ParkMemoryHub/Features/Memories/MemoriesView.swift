@@ -8,10 +8,9 @@ struct MemoriesRoute: View {
     var body: some View {
         MemoriesView(
             repository: dependencies.memories,
-            activitiesRepository: dependencies.activities,
             familyRepository: dependencies.family,
             activeGroup: dependencies.activeGroup,
-            syncEventRepository: dependencies.syncEvents
+            circleSync: dependencies.circleSync
         )
     }
 }
@@ -26,24 +25,21 @@ struct MemoriesView: View {
 
     init(
         repository: (any MemoryRepository)? = nil,
-        activitiesRepository: (any ActivityRepository)? = nil,
         familyRepository: (any FamilyRepository)? = nil,
         activeGroup: GroupSpace? = nil,
-        syncEventRepository: (any SyncEventRepository)? = nil
+        circleSync: (any CircleSyncing)? = nil
     ) {
         let previewDependencies = AppDependencies.preview()
         let memoryRepository = repository ?? previewDependencies.memories
-        let activitiesRepository = activitiesRepository ?? previewDependencies.activities
         let familyRepository = familyRepository ?? previewDependencies.family
         let activeGroup = activeGroup ?? previewDependencies.activeGroup
-        let syncEventRepository = syncEventRepository ?? previewDependencies.syncEvents
+        let circleSync = circleSync ?? previewDependencies.circleSync
         _viewModel = StateObject(
             wrappedValue: MemoriesViewModel(
                 repository: memoryRepository,
-                activitiesRepository: activitiesRepository,
                 familyRepository: familyRepository,
                 activeGroup: activeGroup,
-                syncEventRepository: syncEventRepository
+                circleSync: circleSync
             )
         )
     }

@@ -7,7 +7,8 @@ struct AppDependencies: Sendable {
     let groups: any GroupRepository
     let activeGroup: GroupSpace
     let preferences: any PreferencesRepository
-    let syncEvents: any SyncEventRepository
+    let circleSync: any CircleSyncing
+    let circleRole: CircleRole
 
     static func production() -> AppDependencies {
         let identity = FileDeviceIdentityStore.loadOrCreate()
@@ -21,9 +22,9 @@ struct AppDependencies: Sendable {
                 defaultGroupID: identity.groupID,
                 defaultMemberID: identity.memberID
             ),
-            syncEvents: FileSyncEventRepository(),
             identity: identity,
-            useFileBackedProfile: true
+            useFileBackedProfile: true,
+            useCloudKit: true
         )
     }
 
@@ -37,7 +38,6 @@ struct AppDependencies: Sendable {
         return baseDependencies(
             memories: InMemoryMemoryRepository(),
             activities: InMemoryActivityRepository(),
-            syncEvents: InMemorySyncEventRepository(),
             identity: identity
         )
     }
@@ -45,9 +45,9 @@ struct AppDependencies: Sendable {
     private static func baseDependencies(
         memories: any MemoryRepository,
         activities: any ActivityRepository,
-        syncEvents: any SyncEventRepository,
         identity: DeviceIdentity,
-        useFileBackedProfile: Bool = false
+        useFileBackedProfile: Bool = false,
+        useCloudKit: Bool = false
     ) -> AppDependencies {
         let group = GroupSpace(
             id: identity.groupID,
@@ -61,7 +61,7 @@ struct AppDependencies: Sendable {
             id: identity.memberID,
             groupID: group.id,
             displayName: "Me",
-            role: .owner,
+            role: identity.role == .owner ? .owner : .member,
             isCurrentUser: true,
             sharesLocation: false,
             lastSeenAt: Date(),
@@ -78,6 +78,17 @@ struct AppDependencies: Sendable {
             ? FilePreferencesRepository()
             : InMemoryPreferencesRepository()
 
+        let circleSync: any CircleSyncing = useCloudKit
+            ? CircleSyncCoordinator(
+                identity: identity,
+                familyRepository: familyRepository,
+                memoryRepository: memories,
+                activitiesRepository: activities,
+                activeGroup: group,
+                tokenStore: FileChangeTokenStore()
+            )
+            : NoOpCircleSync()
+
         return AppDependencies(
             memories: memories,
             activities: activities,
@@ -85,7 +96,8 @@ struct AppDependencies: Sendable {
             groups: InMemoryGroupRepository(activeGroup: group),
             activeGroup: group,
             preferences: preferencesRepository,
-            syncEvents: syncEvents
+            circleSync: circleSync,
+            circleRole: identity.role
         )
     }
 }

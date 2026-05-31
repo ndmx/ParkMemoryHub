@@ -5,6 +5,7 @@ actor FileMemoryRepository: MemoryRepository {
     private let metadataURL: URL
     private let defaultGroupID: GroupSpace.ID?
     private let defaultMemberID: FamilyMember.ID?
+    private var _cache: [ParkMemory]?
 
     init(
         rootDirectoryURL: URL? = nil,
@@ -187,7 +188,7 @@ actor FileMemoryRepository: MemoryRepository {
         }
 
         memories.removeAll { $0.id == id }
-        try persist(memories)
+        try persist(memories)  // persist() updates _cache
     }
 
     private func ensureStorageExists() throws {
@@ -198,14 +199,19 @@ actor FileMemoryRepository: MemoryRepository {
     }
 
     private func loadMemories() throws -> [ParkMemory] {
+        if let cached = _cache { return cached }
+
         try ensureStorageExists()
 
         guard FileManager.default.fileExists(atPath: metadataURL.path) else {
+            _cache = []
             return []
         }
 
         let data = try Data(contentsOf: metadataURL)
-        return try JSONDecoder().decode([ParkMemory].self, from: data)
+        let memories = try JSONDecoder().decode([ParkMemory].self, from: data)
+        _cache = memories
+        return memories
     }
 
     private func persist(_ memories: [ParkMemory]) throws {
@@ -215,6 +221,7 @@ actor FileMemoryRepository: MemoryRepository {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(memories)
         try data.write(to: metadataURL, options: [.atomic])
+        _cache = memories
     }
 
     private func normalizedMemory(_ memory: ParkMemory) -> ParkMemory {

@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 
 @MainActor
@@ -7,7 +8,6 @@ final class ProfileViewModel: ObservableObject {
     @Published var displayName = ""
     @Published private(set) var avatarImageData: Data?
     @Published var preferences = UserPreferences()
-    @Published private(set) var syncEventCount = 0
     @Published private(set) var isLoading = false
     @Published private(set) var isSaving = false
     @Published private(set) var isSyncingICloud = false
@@ -19,37 +19,21 @@ final class ProfileViewModel: ObservableObject {
     }
 
     private let familyRepository: any FamilyRepository
-    private let memoryRepository: any MemoryRepository
-    private let activitiesRepository: any ActivityRepository
     private let preferencesRepository: any PreferencesRepository
-    private let syncEventRepository: any SyncEventRepository
+    private let circleSync: any CircleSyncing
     private var lastSavedPreferences = UserPreferences()
     let activeGroup: GroupSpace
 
-    private var cloudSyncCoordinator: GroupCloudSyncCoordinator {
-        GroupCloudSyncCoordinator(
-            familyRepository: familyRepository,
-            memoryRepository: memoryRepository,
-            activitiesRepository: activitiesRepository,
-            syncEventRepository: syncEventRepository,
-            activeGroup: activeGroup
-        )
-    }
-
     init(
         familyRepository: any FamilyRepository,
-        memoryRepository: any MemoryRepository,
-        activitiesRepository: any ActivityRepository,
         preferencesRepository: any PreferencesRepository,
         activeGroup: GroupSpace,
-        syncEventRepository: any SyncEventRepository
+        circleSync: any CircleSyncing
     ) {
         self.familyRepository = familyRepository
-        self.memoryRepository = memoryRepository
-        self.activitiesRepository = activitiesRepository
         self.preferencesRepository = preferencesRepository
         self.activeGroup = activeGroup
-        self.syncEventRepository = syncEventRepository
+        self.circleSync = circleSync
     }
 
     var visibleGroup: GroupSpace {
@@ -75,7 +59,6 @@ final class ProfileViewModel: ObservableObject {
                 async let loadedCurrentMember = familyRepository.currentMember()
                 async let loadedMembers = familyRepository.listMembers()
                 async let loadedPreferences = preferencesRepository.loadPreferences()
-                async let loadedSyncEvents = syncEventRepository.listEvents(groupID: activeGroup.id)
 
                 let member = try await loadedCurrentMember
                 var loadedPreferencesValue = try await loadedPreferences
@@ -87,7 +70,6 @@ final class ProfileViewModel: ObservableObject {
                 avatarImageData = FileProfileAvatarStore.avatarData(filename: member.avatarLocalAssetIdentifier)
                 preferences = loadedPreferencesValue
                 lastSavedPreferences = loadedPreferencesValue
-                syncEventCount = try await loadedSyncEvents.count
                 try await refreshFromICloud(showStatus: false)
             } catch {
                 errorMessage = error.localizedDescription
@@ -135,19 +117,12 @@ final class ProfileViewModel: ObservableObject {
                     try FileDeviceIdentityStore.updateGroupDisplayName(Self.circleName(for: cleanDisplayName))
                     NotificationCenter.default.post(name: .parkMemoryHubGroupDidChange, object: nil)
                 }
-                try await recordSyncEvent(
-                    type: .memberProfileUpdated,
-                    subjectID: savedMember.id,
-                    createdByMemberID: savedMember.id,
-                    payload: savedMember
-                )
-                _ = try await cloudSyncCoordinator.pushPendingEvents()
+                try await circleSync.pushMember(savedMember, avatarData: newAvatarImageData)
                 currentMember = savedMember
                 members = try await familyRepository.listMembers()
                 displayName = currentMember?.displayName ?? cleanDisplayName
-                syncEventCount = try await syncEventRepository.listEvents(groupID: activeGroup.id).count
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
 
             isSaving = false
@@ -191,28 +166,16 @@ final class ProfileViewModel: ObservableObject {
             do {
                 try await refreshFromICloud(showStatus: true)
             } catch {
-                errorMessage = GroupCloudSyncErrorFormatter.message(for: error)
+                errorMessage = CircleSyncErrorFormatter.message(for: error)
             }
 
             isSyncingICloud = false
         }
     }
 
-    private func recordSyncEvent<Payload: Encodable>(
-        type: GroupSyncEvent.EventType,
-        subjectID: UUID?,
-        createdByMemberID: FamilyMember.ID?,
-        payload: Payload
-    ) async throws {
-        let event = try GroupSyncEvent(
-            groupID: activeGroup.id,
-            createdByMemberID: createdByMemberID,
-            type: type,
-            subjectID: subjectID,
-            payload: payload
-        )
-
-        try await syncEventRepository.appendEvent(event)
+    /// Owner-only: builds (or fetches) the circle's `CKShare` for the share sheet.
+    func prepareShare() async throws -> (CKShare, CKContainer) {
+        try await circleSync.prepareShare(displayName: visibleGroupDisplayName)
     }
 
     private func shouldRenameCircle(afterChangingFrom previousDisplayName: String) -> Bool {
@@ -221,8 +184,7 @@ final class ProfileViewModel: ObservableObject {
     }
 
     private func refreshFromICloud(showStatus: Bool) async throws {
-        let result = try await cloudSyncCoordinator.sync(currentMemberID: currentMember?.id)
-        syncEventCount = try await syncEventRepository.listEvents(groupID: activeGroup.id).count
+        let result = try await circleSync.refresh()
         members = try await familyRepository.listMembers()
 
         if showStatus {

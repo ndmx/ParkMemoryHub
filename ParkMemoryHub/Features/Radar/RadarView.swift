@@ -7,10 +7,8 @@ struct RadarRoute: View {
     var body: some View {
         RadarView(
             familyRepository: dependencies.family,
-            memoryRepository: dependencies.memories,
-            activitiesRepository: dependencies.activities,
             activeGroup: dependencies.activeGroup,
-            syncEventRepository: dependencies.syncEvents
+            circleSync: dependencies.circleSync
         )
     }
 }
@@ -23,18 +21,14 @@ struct RadarView: View {
 
     init(
         familyRepository: any FamilyRepository,
-        memoryRepository: any MemoryRepository,
-        activitiesRepository: any ActivityRepository,
         activeGroup: GroupSpace,
-        syncEventRepository: any SyncEventRepository
+        circleSync: any CircleSyncing
     ) {
         _viewModel = StateObject(
             wrappedValue: RadarViewModel(
                 familyRepository: familyRepository,
-                memoryRepository: memoryRepository,
-                activitiesRepository: activitiesRepository,
                 activeGroup: activeGroup,
-                syncEventRepository: syncEventRepository
+                circleSync: circleSync
             )
         )
     }
@@ -550,10 +544,8 @@ private struct FamilyMemberCard: View {
     let dependencies = AppDependencies.preview()
     RadarView(
         familyRepository: dependencies.family,
-        memoryRepository: dependencies.memories,
-        activitiesRepository: dependencies.activities,
         activeGroup: dependencies.activeGroup,
-        syncEventRepository: dependencies.syncEvents
+        circleSync: dependencies.circleSync
     )
 }
 

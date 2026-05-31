@@ -1,14 +1,7 @@
-# Firebase / Google config (do not commit secrets)
-ParkMemoryHub/GoogleService-Info.plist
-ParkMemoryHub/firestore.rules
-ParkMemoryHub/storage.rules
-
 # Xcode
 DerivedData/
 *.xcuserdatad/
 *.xcuserdata/
-.DS_Store
-# Xcode
 .DS_Store
 build/
 *.pbxuser
@@ -47,8 +40,7 @@ fastlane/test_output
 # Code Injection
 iOSInjectionProject/
 
-# Firebase (keep config file but ignore debug symbols)
-# GoogleService-Info.plist  # Uncomment if you want to keep config private
+# Debug symbols
 *.dSYM.zip
 *.dSYM
 

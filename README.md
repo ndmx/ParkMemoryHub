@@ -2,15 +2,15 @@
 
 ParkMemory Hub is an iOS app for small groups who want to collect trip memories, coordinate plans, and find each other during a park visit.
 
-The current app is Apple-first and local-first. Each device creates its own identity and circle on first launch. People join a shared circle through an invite link or invite code, and group updates sync through CloudKit.
+The current app is Apple-first and local-first. Each device creates its own identity and circle on first launch. The circle's creator hosts it as a CloudKit shared zone in their private database; other people join by tapping an iCloud share link, and group updates sync through that shared zone.
 
 ## Features
 
 - Memories: create photo memories with captions, tags, and optional locations.
 - Radar: share your location with your circle and open member coordinates in Maps.
 - Planner: create plans, add optional times and places, vote as a group, and update plan status.
-- Profile: set your name and profile photo, start or join a circle, share invites, and run manual sync.
-- Sync: memories, planner updates, and radar updates sync through CloudKit, with manual iCloud sync available as a fallback.
+- Profile: set your name and profile photo, start a circle, invite people (and manage or remove participants), and run manual sync.
+- Sync: memories, planner updates, and radar updates sync through a CloudKit shared zone, with manual iCloud sync available on demand.
 
 ## Architecture
 
@@ -46,15 +46,15 @@ xcodebuild -project ParkMemoryHub.xcodeproj -scheme ParkMemoryHub -configuration
 
 ## Sync Model
 
-- Every device has a unique `DeviceIdentity` with a unique member id and circle id.
-- Starting a new circle creates a new circle UUID.
-- Joining a circle stores the invite's circle id on that device.
-- CloudKit stores group sync events keyed by circle id.
-- Devices pull and apply only events for their current circle.
+- Every device has a unique `DeviceIdentity` recording its member id, circle id, role (owner or participant), and the circle's CloudKit zone.
+- Starting a circle provisions a custom CloudKit zone in the creator's private database, with a root `Circle` record and a `CKShare`.
+- Inviting someone shares that `CKShare` link; accepting it joins the device as a read-write participant via their shared database.
+- Members, memories (with photo assets), and plans sync as individual `CKRecord`s in the zone, fetched as deltas using a persisted server change token.
+- Membership and read/write access are enforced by the CloudKit server. The owner can remove a participant to revoke access.
 
 ## Privacy
 
-Location sharing is opt-in. The app stores its working data locally and uses CloudKit for circle sync. There is no third-party backend dependency in the current app.
+Location sharing is opt-in, and a member's last known location is stored in a CloudKit field-level encrypted value. Circle data lives in the owner's private/shared CloudKit databases — only invited participants can read it, and there is no public database or third-party backend. The app keeps a local-first copy of its working data on each device.
 
 Release prep documents:
 

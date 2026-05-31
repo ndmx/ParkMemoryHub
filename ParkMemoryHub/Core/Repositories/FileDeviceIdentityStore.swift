@@ -33,11 +33,22 @@ enum FileDeviceIdentityStore {
         }
     }
 
+    /// Records that this device joined another member's circle as a share
+    /// participant. The circle id, zone, and share owner come from the accepted
+    /// `CKShareMetadata`. The device's own `memberID` is preserved.
     @discardableResult
-    static func acceptInvite(_ invite: GroupInvite) throws -> DeviceIdentity {
+    static func joinCircle(
+        circleID: GroupSpace.ID,
+        displayName: String,
+        zoneName: String,
+        zoneOwnerName: String
+    ) throws -> DeviceIdentity {
         var identity = loadOrCreate()
-        identity.groupID = invite.groupID
-        identity.groupDisplayName = invite.groupDisplayName
+        identity.groupID = circleID
+        identity.groupDisplayName = displayName
+        identity.role = .participant
+        identity.zoneName = zoneName
+        identity.zoneOwnerName = zoneOwnerName
         try save(identity)
         return identity
     }
@@ -45,9 +56,13 @@ enum FileDeviceIdentityStore {
     @discardableResult
     static func createNewCircle(displayName: String) throws -> DeviceIdentity {
         var identity = loadOrCreate()
-        identity.groupID = UUID()
+        let groupID = UUID()
+        identity.groupID = groupID
         identity.groupDisplayName = displayName
         identity.createdAt = Date()
+        identity.role = .owner
+        identity.zoneName = DeviceIdentity.defaultZoneName(for: groupID)
+        identity.zoneOwnerName = nil
         try save(identity)
         return identity
     }

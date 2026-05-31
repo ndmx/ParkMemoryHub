@@ -4,12 +4,12 @@ Last updated: April 26, 2026
 
 ## Must Do Before TestFlight or App Review
 
-- Deploy the CloudKit schema for `iCloud.lxr.ParkMemoryHub` to the production environment
+- Exercise every record-creating path in Development first (start circle, share location, add a photo memory, create a plan, vote), then deploy the CloudKit schema for `iCloud.lxr.ParkMemoryHub` to the production environment
 - Verify the production schema includes:
-  - `GroupSyncEvent`
-  - `MemoryMediaAsset`
+  - `Circle`, `Member`, `Memory`, `MemoryMedia`, `Plan`
+  - `Member.location` as an encrypted value and `MemoryMedia.asset` as an asset
   - the current fields used by the app
-- Confirm the app works with production CloudKit, not only development CloudKit
+- Confirm the app works with production CloudKit, not only development CloudKit (TestFlight builds use the production environment)
 - Publish a public Privacy Policy URL
 - Publish a public Support URL
 - Complete App Store Connect privacy answers for the real app behavior
@@ -42,7 +42,8 @@ Verify:
 - memory appears on second device
 - planner item visibility works for Circle, Some Members, and Only Me
 - radar sharing turns on and off correctly
-- join flow works from invite link
+- join flow works from the iCloud share link (tap link, accept inside the app)
+- removing a participant from the share revokes their access
 - leave circle moves the device into a new circle
 
 ## Product Metadata

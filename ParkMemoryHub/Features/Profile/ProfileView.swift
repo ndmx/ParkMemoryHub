@@ -8,39 +8,37 @@ struct ProfileRoute: View {
     var body: some View {
         ProfileView(
             familyRepository: dependencies.family,
-            memoryRepository: dependencies.memories,
-            activitiesRepository: dependencies.activities,
             preferencesRepository: dependencies.preferences,
             activeGroup: dependencies.activeGroup,
-            syncEventRepository: dependencies.syncEvents
+            circleSync: dependencies.circleSync,
+            isOwner: dependencies.circleRole == .owner
         )
     }
 }
 
 struct ProfileView: View {
     @StateObject private var viewModel: ProfileViewModel
-    @State private var isShowingInvite = false
-    @State private var isShowingJoinGroup = false
+    private let isOwner: Bool
+    @State private var preparedShare: PreparedShare?
+    @State private var isPreparingShare = false
     @State private var isEditingProfile = false
     @State private var isConfirmingNewCircle = false
     @State private var isConfirmingLeaveGroup = false
 
     init(
         familyRepository: any FamilyRepository,
-        memoryRepository: any MemoryRepository,
-        activitiesRepository: any ActivityRepository,
         preferencesRepository: any PreferencesRepository,
         activeGroup: GroupSpace,
-        syncEventRepository: any SyncEventRepository
+        circleSync: any CircleSyncing,
+        isOwner: Bool = true
     ) {
+        self.isOwner = isOwner
         _viewModel = StateObject(
             wrappedValue: ProfileViewModel(
                 familyRepository: familyRepository,
-                memoryRepository: memoryRepository,
-                activitiesRepository: activitiesRepository,
                 preferencesRepository: preferencesRepository,
                 activeGroup: activeGroup,
-                syncEventRepository: syncEventRepository
+                circleSync: circleSync
             )
         )
     }
@@ -69,16 +67,21 @@ struct ProfileView: View {
                             LabeledContent("Circle Code", value: viewModel.activeGroup.groupCode)
                             LabeledContent("Members", value: "\(viewModel.members.count)")
 
-                            Button {
-                                isShowingInvite = true
-                            } label: {
-                                Label("Invite to Circle", systemImage: "person.badge.plus")
-                            }
-
-                            Button {
-                                isShowingJoinGroup = true
-                            } label: {
-                                Label("Join Circle", systemImage: "link.badge.plus")
+                            if isOwner {
+                                Button {
+                                    prepareShare()
+                                } label: {
+                                    if isPreparingShare {
+                                        ProgressView()
+                                    } else {
+                                        Label("Invite to Circle", systemImage: "person.badge.plus")
+                                    }
+                                }
+                                .disabled(isPreparingShare)
+                            } else {
+                                Text("Only the circle's creator can invite people. Tap a shared invite link to join a circle.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
                             }
 
                             Button {
@@ -109,7 +112,6 @@ struct ProfileView: View {
                         Section("Storage") {
                             LabeledContent("Data", value: "This device + iCloud")
                             LabeledContent("iCloud Sync", value: "Automatic")
-                            LabeledContent("Sync Records", value: "\(viewModel.syncEventCount)")
                         }
 
                         Section("iCloud Sync") {
@@ -179,11 +181,9 @@ struct ProfileView: View {
             .onAppear {
                 viewModel.load()
             }
-            .sheet(isPresented: $isShowingInvite) {
-                ProfileInviteView(group: viewModel.visibleGroup)
-            }
-            .sheet(isPresented: $isShowingJoinGroup) {
-                JoinGroupView(currentGroup: viewModel.activeGroup)
+            .sheet(item: $preparedShare) { prepared in
+                CloudSharingView(share: prepared.share, container: prepared.container)
+                    .ignoresSafeArea()
             }
             .sheet(isPresented: $isEditingProfile) {
                 EditProfileView(
@@ -201,6 +201,19 @@ struct ProfileView: View {
             && !viewModel.isSaving
             && viewModel.hasUnsavedChanges
             && !viewModel.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func prepareShare() {
+        isPreparingShare = true
+        Task {
+            do {
+                let (share, container) = try await viewModel.prepareShare()
+                preparedShare = PreparedShare(share: share, container: container)
+            } catch {
+                viewModel.errorMessage = CircleSyncErrorFormatter.message(for: error)
+            }
+            isPreparingShare = false
+        }
     }
 
     private var errorBinding: Binding<Bool> {
@@ -405,224 +418,6 @@ private struct ProfileAvatarView: View {
     }
 }
 
-private struct ProfileInviteView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var copiedMessage: String?
-    let group: GroupSpace
-
-    private var invite: GroupInvite {
-        GroupInvite(group: group)
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Invite Code") {
-                    LabeledContent("Circle Code", value: group.groupCode)
-
-                    Text(inviteCode)
-                        .font(.footnote.monospaced())
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 8)
-                        .textSelection(.enabled)
-
-                    ShareLink(item: inviteMessage) {
-                        Label("Share Invite", systemImage: "square.and.arrow.up")
-                    }
-
-                    Button {
-                        copyInviteCode()
-                    } label: {
-                        Label("Copy Invite Code", systemImage: "doc.on.doc")
-                    }
-                }
-
-                Section("Invite Link") {
-                    Text(inviteURL.absoluteString)
-                        .font(.footnote.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-
-                    ShareLink(item: inviteURL.absoluteString) {
-                        Label("Share Link", systemImage: "link")
-                    }
-
-                    Button {
-                        copyInviteLink()
-                    } label: {
-                        Label("Copy Invite Link", systemImage: "doc.on.doc")
-                    }
-                }
-            }
-            .navigationTitle("Invite to Circle")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-            .alert("Copied", isPresented: copiedBinding) {
-                Button("OK") {
-                    copiedMessage = nil
-                }
-            } message: {
-                Text(copiedMessage ?? "Copied to clipboard.")
-            }
-        }
-    }
-
-    private var inviteCode: String {
-        (try? GroupInviteCodec.token(for: invite)) ?? ""
-    }
-
-    private var inviteURL: URL {
-        (try? GroupInviteCodec.url(for: invite)) ?? URL(string: "parkmemoryhub://join")!
-    }
-
-    private var inviteMessage: String {
-        "Join \(group.displayName) in Park Memory Hub.\n\nOpen Park Memory Hub, go to Profile, tap Join Circle, and paste this invite code:\n\(inviteCode)\n\nInvite link:\n\(inviteURL.absoluteString)"
-    }
-
-    private var copiedBinding: Binding<Bool> {
-        Binding(
-            get: { copiedMessage != nil },
-            set: { newValue in
-                if !newValue {
-                    copiedMessage = nil
-                }
-            }
-        )
-    }
-
-    private func copyInviteCode() {
-        UIPasteboard.general.string = inviteCode
-        copiedMessage = "Invite code copied."
-    }
-
-    private func copyInviteLink() {
-        UIPasteboard.general.string = inviteURL.absoluteString
-        copiedMessage = "Invite link copied."
-    }
-}
-
-private struct JoinGroupView: View {
-    @Environment(\.dismiss) private var dismiss
-    let currentGroup: GroupSpace
-    @State private var inviteText = ""
-    @State private var errorMessage: String?
-    @State private var isJoining = false
-    @State private var groupStatusMessage: String?
-    @State private var shouldReloadAfterStatus = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Current Circle") {
-                    LabeledContent("Circle Code", value: currentGroup.groupCode)
-                }
-
-                Section("Invite") {
-                    TextField("Invite link or code", text: $inviteText, axis: .vertical)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .lineLimit(3...6)
-
-                    Button {
-                        pasteInvite()
-                    } label: {
-                        Label("Paste From Clipboard", systemImage: "doc.on.clipboard")
-                    }
-                }
-
-                if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
-                    }
-                }
-            }
-            .navigationTitle("Join Circle")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        joinGroup()
-                    } label: {
-                        if isJoining {
-                            ProgressView()
-                        } else {
-                            Text("Join")
-                        }
-                    }
-                    .disabled(inviteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isJoining)
-                }
-            }
-            .alert("Circle Status", isPresented: groupStatusBinding) {
-                Button("OK") {
-                    groupStatusMessage = nil
-                    if shouldReloadAfterStatus {
-                        NotificationCenter.default.post(name: .parkMemoryHubGroupDidChange, object: nil)
-                        shouldReloadAfterStatus = false
-                    }
-                    dismiss()
-                }
-            } message: {
-                Text(groupStatusMessage ?? "Circle updated.")
-            }
-        }
-    }
-
-    private var groupStatusBinding: Binding<Bool> {
-        Binding(
-            get: { groupStatusMessage != nil },
-            set: { newValue in
-                if !newValue {
-                    groupStatusMessage = nil
-                }
-            }
-        )
-    }
-
-    private func pasteInvite() {
-        if let clipboardText = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !clipboardText.isEmpty {
-            inviteText = clipboardText
-        }
-    }
-
-    private func joinGroup() {
-        isJoining = true
-        errorMessage = nil
-
-        do {
-            let invite = try GroupInviteCodec.invite(from: inviteText)
-
-            if currentGroup.id == invite.groupID {
-                groupStatusMessage = "This device is already in \(invite.groupDisplayName). Circle code \(invite.groupCode)."
-                shouldReloadAfterStatus = false
-                isJoining = false
-                return
-            }
-
-            try FileDeviceIdentityStore.acceptInvite(invite)
-            groupStatusMessage = "Joined \(invite.groupDisplayName). Circle code \(invite.groupCode)."
-            shouldReloadAfterStatus = true
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-
-        isJoining = false
-    }
-}
-
 private struct ProfileMemberRow: View {
     let member: FamilyMember
 
@@ -718,10 +513,8 @@ private extension FamilyMember.Role {
 
     ProfileView(
         familyRepository: dependencies.family,
-        memoryRepository: dependencies.memories,
-        activitiesRepository: dependencies.activities,
         preferencesRepository: dependencies.preferences,
         activeGroup: dependencies.activeGroup,
-        syncEventRepository: dependencies.syncEvents
+        circleSync: dependencies.circleSync
     )
 }

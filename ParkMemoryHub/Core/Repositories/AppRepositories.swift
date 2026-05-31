@@ -43,10 +43,3 @@ protocol PreferencesRepository: Sendable {
     func loadPreferences() async throws -> UserPreferences
     func savePreferences(_ preferences: UserPreferences) async throws
 }
-
-protocol SyncEventRepository: Sendable {
-    func listEvents(groupID: GroupSpace.ID?) async throws -> [GroupSyncEvent]
-    @discardableResult
-    func appendEvent(_ event: GroupSyncEvent) async throws -> GroupSyncEvent
-    func appendEvents(_ events: [GroupSyncEvent]) async throws
-}
