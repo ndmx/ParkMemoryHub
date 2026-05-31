@@ -58,12 +58,13 @@ struct ProfileView: View {
                                     member: viewModel.currentMember,
                                     avatarImageData: viewModel.avatarImageData
                                 )
-                            }
-                            .buttonStyle(.plain)
-                        }
+	                            }
+	                            .buttonStyle(.plain)
+	                        }
+	                        .listRowBackground(Color.clear)
 
-                        Section("Circle") {
-                            LabeledContent("Name", value: viewModel.visibleGroupDisplayName)
+	                        Section("Circle") {
+	                            LabeledContent("Name", value: viewModel.visibleGroupDisplayName)
                             LabeledContent("Circle Code", value: viewModel.activeGroup.groupCode)
                             LabeledContent("Members", value: "\(viewModel.members.count)")
 
@@ -96,39 +97,47 @@ struct ProfileView: View {
                                 Label("Leave Circle", systemImage: "rectangle.portrait.and.arrow.right")
                             }
 
-                            ForEach(viewModel.members) { member in
-                                ProfileMemberRow(member: member)
-                            }
-                        }
+	                            ForEach(viewModel.members) { member in
+	                                ProfileMemberRow(member: member)
+	                            }
+	                        }
+	                        .listRowBackground(Color.clear)
 
-                        Section("Location Sharing") {
-                            Toggle("Share My Location", isOn: $viewModel.preferences.shareLocation)
+	                        Section("Location Sharing") {
+	                            Toggle("Share My Location", isOn: $viewModel.preferences.shareLocation)
 
                             Text("Radar and current-location tagging stay off until you enable them on this device.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
+	                                .font(.footnote)
+	                                .foregroundStyle(.secondary)
+	                        }
+	                        .listRowBackground(Color.clear)
 
-                        Section("Storage") {
-                            LabeledContent("Data", value: "This device + iCloud")
-                            LabeledContent("iCloud Sync", value: "Automatic")
-                        }
+	                        Section("Storage") {
+	                            LabeledContent("Data", value: "This device + iCloud")
+	                            LabeledContent("iCloud Sync", value: "Automatic")
+	                        }
+	                        .listRowBackground(Color.clear)
 
-                        Section("iCloud Sync") {
-                            Button {
-                                viewModel.syncWithICloud()
+	                        Section("iCloud Sync") {
+	                            Button {
+	                                viewModel.syncWithICloud()
                             } label: {
                                 if viewModel.isSyncingICloud {
                                     ProgressView()
                                 } else {
                                     Label("Sync with iCloud", systemImage: "icloud.and.arrow.up")
                                 }
-                            }
-                            .disabled(viewModel.isSyncingICloud)
-                        }
-                    }
+	                            }
+	                            .disabled(viewModel.isSyncingICloud)
+	                        }
+	                        .listRowBackground(Color.clear)
+	                    }
+	                    .scrollContentBackground(.hidden)
+                    .contentMargins(.bottom, 24, for: .scrollContent)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .appScreenBackground(.pearl)
             .navigationTitle("Profile")
             .toolbar {
                 if viewModel.hasUnsavedChanges {
@@ -249,16 +258,17 @@ private struct ProfileHeader: View {
                 imageData: avatarImageData,
                 initials: initials,
                 size: 58,
-                tint: .blue
+                tint: Lumina.Color.accent
             )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(member?.displayName ?? "You")
                     .font(.headline)
+                    .foregroundStyle(Lumina.Color.textPrimary)
 
                 Text("Park Memory Hub")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Lumina.Color.accent)
 
                 if let member {
                     Text("Joined \(member.joinedAt.formatted(date: .abbreviated, time: .omitted))")
@@ -320,14 +330,14 @@ private struct EditProfileView: View {
                                     imageData: avatarImageData,
                                     initials: initials,
                                     size: 96,
-                                    tint: .blue
+                                    tint: Lumina.Color.accent
                                 )
 
                                 Image(systemName: "camera.fill")
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Lumina.Color.onAccent)
                                     .padding(7)
-                                    .background(.blue, in: Circle())
+                                    .background(Lumina.Color.accent, in: Circle())
                             }
                         }
                         .buttonStyle(.plain)
@@ -425,11 +435,11 @@ private struct ProfileMemberRow: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(member.isCurrentUser ? .blue.opacity(0.14) : .secondary.opacity(0.12))
+                    .fill((member.isCurrentUser ? Lumina.Color.accent : Lumina.Color.accentSecondary).opacity(0.16))
 
                 Text(initials)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(member.isCurrentUser ? .blue : .secondary)
+                    .foregroundStyle(member.isCurrentUser ? Lumina.Color.accent : Lumina.Color.accentSecondary)
             }
             .frame(width: 38, height: 38)
 
@@ -437,35 +447,28 @@ private struct ProfileMemberRow: View {
                 HStack(spacing: 6) {
                     Text(member.displayName)
                         .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Lumina.Color.textPrimary)
 
                     if member.isCurrentUser {
                         Text("This Device")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.blue)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(.blue.opacity(0.12), in: Capsule())
+                            .luminaChip(Lumina.Color.accent)
                     }
 
                     if member.role != .member {
                         Text(member.role.title)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.blue)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(.blue.opacity(0.12), in: Capsule())
+                            .luminaChip(Lumina.Color.accentSecondary)
                     }
                 }
 
                 Text(memberStatus)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Lumina.Color.textSubtle)
             }
 
             Spacer()
 
             Image(systemName: member.sharesLocation ? "location.fill" : "location.slash")
-                .foregroundStyle(member.sharesLocation ? .green : .secondary)
+                .foregroundStyle(member.sharesLocation ? Lumina.Status.success : Lumina.Color.textSubtle)
                 .accessibilityLabel(member.sharesLocation ? "Sharing location" : "Location hidden")
         }
         .padding(.vertical, 3)

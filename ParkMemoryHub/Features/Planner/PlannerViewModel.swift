@@ -15,6 +15,7 @@ final class PlannerViewModel: ObservableObject {
     private let familyRepository: any FamilyRepository
     private let activeGroup: GroupSpace
     private let circleSync: any CircleSyncing
+    private var hasLoaded = false
 
     init(
         activitiesRepository: any ActivityRepository,
@@ -29,7 +30,10 @@ final class PlannerViewModel: ObservableObject {
     }
 
     func load() {
-        isLoading = true
+        guard !isLoading else { return }
+
+        let shouldShowFullScreenLoading = !hasLoaded && activities.isEmpty
+        isLoading = shouldShowFullScreenLoading
         errorMessage = nil
 
         Task {
@@ -42,12 +46,14 @@ final class PlannerViewModel: ObservableObject {
                 members = try await loadedMembers
                 memberNamesByID = Dictionary(uniqueKeysWithValues: members.map { ($0.id, $0.displayName) })
                 activities = try await loadedActivities
+                hasLoaded = true
+                isLoading = false
+
                 try await refreshFromICloud(showStatus: false)
             } catch {
                 errorMessage = error.localizedDescription
+                isLoading = false
             }
-
-            isLoading = false
         }
     }
 

@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "app-background-marble.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

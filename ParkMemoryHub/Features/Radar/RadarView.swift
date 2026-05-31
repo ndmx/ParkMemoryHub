@@ -74,8 +74,11 @@ struct RadarView: View {
                         }
                         .padding()
                     }
+                    .contentMargins(.bottom, 24, for: .scrollContent)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .appScreenBackground(.chromePearl)
             .navigationTitle("Radar")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -246,35 +249,35 @@ private struct RadarSummary: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(group.displayName)
-                    .font(.title3.weight(.semibold))
+                    .font(Lumina.Typo.display(26, weight: .semibold))
+                    .foregroundStyle(Lumina.Color.textPrimary)
 
                 Text("Live circle locations")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Lumina.Color.textSubtle)
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: Lumina.Space.sm) {
                 SummaryMetric(
                     title: "Members",
                     value: "\(members.count)",
                     systemImage: "person.3.fill",
-                    tint: .blue
+                    tint: Lumina.Status.info
                 )
 
                 SummaryMetric(
                     title: "Sharing",
                     value: "\(members.filter(\.sharesLocation).count)",
                     systemImage: "location.fill",
-                    tint: .green
+                    tint: Lumina.Status.success
                 )
             }
 
             Text(statusText)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Lumina.Color.textSubtle)
         }
         .padding()
-        .background(.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var statusText: String {
@@ -300,9 +303,9 @@ private struct CurrentRadarLocationCard: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "location.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(.blue)
-                    .frame(width: 38, height: 38)
-                    .background(.blue.opacity(0.1), in: Circle())
+                    .foregroundStyle(Lumina.Color.accent)
+                    .frame(width: 40, height: 40)
+                    .background(Lumina.Color.accent.opacity(0.14), in: Circle())
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Your Location")
@@ -341,11 +344,7 @@ private struct CurrentRadarLocationCard: View {
             .disabled(locationProvider.isRequestingLocation || isSavingLocation)
         }
         .padding()
-        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(.secondary.opacity(0.12))
-        )
+        .appGlassBlock(cornerRadius: 16)
     }
 
     private var currentLocationText: String {
@@ -373,24 +372,26 @@ private struct SummaryMetric: View {
     let tint: Color
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Lumina.Space.sm) {
             Image(systemName: systemImage)
                 .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
-                .background(tint.opacity(0.12), in: Circle())
+                .frame(width: 32, height: 32)
+                .background(tint.opacity(0.14), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(value)
-                    .font(.headline)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Lumina.Color.textPrimary)
                 Text(title)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Lumina.Color.textSubtle)
             }
 
             Spacer()
         }
-        .padding(12)
-        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+        .padding(Lumina.Space.sm)
+        .frame(maxWidth: .infinity)
+        .background(Lumina.Color.overlay, in: RoundedRectangle(cornerRadius: Lumina.Radius.md, style: .continuous))
     }
 }
 
@@ -404,11 +405,11 @@ private struct FamilyMemberCard: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(member.isCurrentUser ? .blue.opacity(0.14) : .purple.opacity(0.14))
+                    .fill(avatarTint.opacity(0.16))
 
                 Text(initials)
                     .font(.headline.weight(.semibold))
-                    .foregroundStyle(member.isCurrentUser ? .blue : .purple)
+                    .foregroundStyle(avatarTint)
             }
             .frame(width: 52, height: 52)
 
@@ -416,14 +417,11 @@ private struct FamilyMemberCard: View {
                 HStack(spacing: 6) {
                     Text(member.displayName)
                         .font(.headline)
+                        .foregroundStyle(Lumina.Color.textPrimary)
 
                     if member.isCurrentUser {
                         Text("This Device")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.blue)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(.blue.opacity(0.1), in: Capsule())
+                            .luminaChip(Lumina.Color.accent)
                     }
                 }
 
@@ -452,33 +450,25 @@ private struct FamilyMemberCard: View {
                     toggleSharing()
                 } label: {
                     Image(systemName: member.sharesLocation ? "location.fill" : "location.slash")
-                        .foregroundStyle(member.sharesLocation ? .green : .secondary)
+                        .foregroundStyle(member.sharesLocation ? Lumina.Status.success : Lumina.Color.textSubtle)
                         .frame(width: 36, height: 36)
-                        .background(.secondary.opacity(0.08), in: Circle())
+                        .background(Lumina.Color.overlayMedium, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(member.sharesLocation ? "Turn Off My Location Sharing" : "Turn On My Location Sharing")
                 .accessibilityAddTraits(.isButton)
             } else {
                 Image(systemName: member.sharesLocation ? "location.fill" : "location.slash")
-                    .foregroundStyle(member.sharesLocation ? .green : .secondary)
+                    .foregroundStyle(member.sharesLocation ? Lumina.Status.success : Lumina.Color.textSubtle)
                     .frame(width: 36, height: 36)
             }
         }
         .padding()
-        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(.secondary.opacity(0.12))
-        )
+        .appGlassBlock(cornerRadius: 16)
         .overlay(alignment: .bottomTrailing) {
             if canOpenInMaps {
                 Label("Map", systemImage: "map")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.blue)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(.blue.opacity(0.1), in: Capsule())
+                    .luminaChip(Lumina.Color.accent)
                     .padding(12)
             }
         }
@@ -490,6 +480,10 @@ private struct FamilyMemberCard: View {
 
     private var isCurrentMember: Bool {
         member.id == currentMember?.id
+    }
+
+    private var avatarTint: Color {
+        member.isCurrentUser ? Lumina.Color.accent : Lumina.Color.accentSecondary
     }
 
     private var canOpenInMaps: Bool {

@@ -22,6 +22,7 @@ final class ProfileViewModel: ObservableObject {
     private let preferencesRepository: any PreferencesRepository
     private let circleSync: any CircleSyncing
     private var lastSavedPreferences = UserPreferences()
+    private var hasLoaded = false
     let activeGroup: GroupSpace
 
     init(
@@ -51,7 +52,10 @@ final class ProfileViewModel: ObservableObject {
     }
 
     func load() {
-        isLoading = true
+        guard !isLoading else { return }
+
+        let shouldShowFullScreenLoading = !hasLoaded && currentMember == nil
+        isLoading = shouldShowFullScreenLoading
         errorMessage = nil
 
         Task {
@@ -70,12 +74,14 @@ final class ProfileViewModel: ObservableObject {
                 avatarImageData = FileProfileAvatarStore.avatarData(filename: member.avatarLocalAssetIdentifier)
                 preferences = loadedPreferencesValue
                 lastSavedPreferences = loadedPreferencesValue
+                hasLoaded = true
+                isLoading = false
+
                 try await refreshFromICloud(showStatus: false)
             } catch {
                 errorMessage = error.localizedDescription
+                isLoading = false
             }
-
-            isLoading = false
         }
     }
 

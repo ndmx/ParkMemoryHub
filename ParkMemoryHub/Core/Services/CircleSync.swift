@@ -32,6 +32,7 @@ struct CircleSyncCoordinator: CircleSyncing {
     private let activitiesRepository: any ActivityRepository
     private let activeGroup: GroupSpace
     private let isOwner: Bool
+    private let refreshGate = CircleSyncRefreshGate()
 
     init(
         identity: DeviceIdentity,
@@ -65,6 +66,12 @@ struct CircleSyncCoordinator: CircleSyncing {
     }
 
     func refresh() async throws -> CircleSyncSummary {
+        try await refreshGate.refresh {
+            try await performRefresh()
+        }
+    }
+
+    private func performRefresh() async throws -> CircleSyncSummary {
         try await service.requireSignedIn()
 
         var summary = CircleSyncSummary()
@@ -223,6 +230,41 @@ struct CircleSyncCoordinator: CircleSyncing {
 
     private func uuid(_ recordName: String, prefix: String) -> UUID? {
         UUID(uuidString: String(recordName.dropFirst(prefix.count)))
+    }
+}
+
+private actor CircleSyncRefreshGate {
+    private let minimumRefreshInterval: TimeInterval = 8
+    private var inFlight: Task<CircleSyncSummary, any Error>?
+    private var lastFinishedAt: Date?
+    private var lastSummary: CircleSyncSummary?
+
+    func refresh(operation: @Sendable @escaping () async throws -> CircleSyncSummary) async throws -> CircleSyncSummary {
+        if let inFlight {
+            return try await inFlight.value
+        }
+
+        if let lastFinishedAt,
+           let lastSummary,
+           Date().timeIntervalSince(lastFinishedAt) < minimumRefreshInterval {
+            return lastSummary
+        }
+
+        let task = Task {
+            try await operation()
+        }
+        inFlight = task
+
+        do {
+            let summary = try await task.value
+            lastSummary = summary
+            lastFinishedAt = Date()
+            inFlight = nil
+            return summary
+        } catch {
+            inFlight = nil
+            throw error
+        }
     }
 }
 

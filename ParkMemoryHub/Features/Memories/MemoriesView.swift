@@ -1,6 +1,7 @@
 import CoreLocation
 import PhotosUI
 import SwiftUI
+import UIKit
 
 struct MemoriesRoute: View {
     @Environment(\.appDependencies) private var dependencies
@@ -91,9 +92,12 @@ struct MemoriesView: View {
                         }
                         .padding()
                     }
-                    .background(Color(.systemGroupedBackground))
+                    .scrollContentBackground(.hidden)
+                    .contentMargins(.bottom, 24, for: .scrollContent)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .appScreenBackground(.chromePearl)
             .navigationTitle("Memories")
             .searchable(text: $searchText, prompt: "Search memories")
             .toolbar {
@@ -205,18 +209,18 @@ private struct MemoriesSummary: View {
     let locatedCount: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Lumina.Space.md) {
             Text("Highlights")
-                .font(.title3.weight(.semibold))
+                .font(Lumina.Typo.display(26, weight: .semibold))
+                .foregroundStyle(Lumina.Color.textPrimary)
 
-            HStack(spacing: 10) {
-                MemoryMetric(title: "Saved", value: "\(memoryCount)", systemImage: "photo.stack", tint: .blue)
-                MemoryMetric(title: "Tagged", value: "\(taggedCount)", systemImage: "tag.fill", tint: .purple)
-                MemoryMetric(title: "Places", value: "\(locatedCount)", systemImage: "mappin.and.ellipse", tint: .green)
+            HStack(spacing: Lumina.Space.sm) {
+                MemoryMetric(title: "Saved", value: "\(memoryCount)", systemImage: "photo.stack", tint: Lumina.Status.info)
+                MemoryMetric(title: "Tagged", value: "\(taggedCount)", systemImage: "tag.fill", tint: Lumina.Status.highlight)
+                MemoryMetric(title: "Places", value: "\(locatedCount)", systemImage: "mappin.and.ellipse", tint: Lumina.Status.neutral)
             }
         }
         .padding()
-        .background(.background, in: RoundedRectangle(cornerRadius: 16))
     }
 }
 
@@ -227,21 +231,24 @@ private struct MemoryMetric: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Lumina.Space.xs) {
             Image(systemName: systemImage)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.14), in: Circle())
 
             Text(value)
-                .font(.headline)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(Lumina.Color.textPrimary)
 
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Lumina.Color.textSubtle)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(tint.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+        .padding(Lumina.Space.sm)
+        .background(Lumina.Color.overlay, in: RoundedRectangle(cornerRadius: Lumina.Radius.md, style: .continuous))
     }
 }
 
@@ -325,8 +332,8 @@ private struct MemoryCard: View {
 
                 if !memory.tags.isEmpty {
                     Text(memory.tags.prefix(3).map { "#\($0)" }.joined(separator: " "))
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.blue)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Lumina.Color.accent)
                         .lineLimit(1)
                 }
             }
@@ -337,11 +344,7 @@ private struct MemoryCard: View {
         }
         .frame(width: cardWidth, height: cardHeight, alignment: .top)
         .padding(10)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(.secondary.opacity(0.12))
-        )
+        .appGlassBlock(cornerRadius: 18)
     }
 }
 
@@ -809,43 +812,109 @@ private struct MemoryMediaPreview: View {
 
     var body: some View {
         GeometryReader { proxy in
-            if let image = localImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledForMemoryPreview(contentMode)
-                    .frame(width: proxy.size.width, height: proxy.size.height)
+            if let mediaURL {
+                AsyncMemoryImage(
+                    mediaURL: mediaURL,
+                    mediaKind: mediaKind,
+                    hasMediaReference: hasMediaReference,
+                    contentMode: contentMode
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
             } else {
-                Rectangle()
-                    .fill(.blue.opacity(0.12))
+                MemoryMediaPlaceholder(mediaKind: mediaKind, hasMediaReference: hasMediaReference)
                     .frame(width: proxy.size.width, height: proxy.size.height)
-                    .overlay {
-                        VStack(spacing: 8) {
-                            Image(systemName: mediaKind == .photo ? "photo" : "video")
-                                .font(.system(size: 34))
-                                .foregroundStyle(.blue)
-
-                            if hasMediaReference {
-                                Text("Photo unavailable")
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
             }
         }
         .clipped()
     }
+}
 
-    private var localImage: UIImage? {
-        guard let url = mediaURL else {
-            return nil
+private struct AsyncMemoryImage: View {
+    let mediaURL: URL
+    let mediaKind: ParkMemory.MediaKind
+    let hasMediaReference: Bool
+    let contentMode: MemoryMediaPreview.ContentMode
+
+    @State private var image: UIImage?
+    @State private var didLoad = false
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledForMemoryPreview(contentMode)
+            } else {
+                MemoryMediaPlaceholder(mediaKind: mediaKind, hasMediaReference: didLoad || hasMediaReference)
+            }
+        }
+        .task(id: mediaURL) {
+            await loadImage()
+        }
+    }
+
+    @MainActor
+    private func loadImage() async {
+        didLoad = false
+
+        if let cachedImage = MemoryPreviewImageCache.shared.image(for: mediaURL) {
+            image = cachedImage
+            didLoad = true
+            return
         }
 
-        guard let data = try? Data(contentsOf: url) else {
-            return nil
-        }
+        let loadedImage = await Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: mediaURL) else {
+                return nil as UIImage?
+            }
 
-        return UIImage(data: data)
+            return UIImage(data: data)
+        }.value
+
+        if let loadedImage {
+            MemoryPreviewImageCache.shared.insert(loadedImage, for: mediaURL)
+        }
+        image = loadedImage
+        didLoad = true
+    }
+}
+
+private final class MemoryPreviewImageCache {
+    static let shared = MemoryPreviewImageCache()
+
+    private let cache = NSCache<NSURL, UIImage>()
+
+    private init() {}
+
+    func image(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
+    func insert(_ image: UIImage, for url: URL) {
+        cache.setObject(image, forKey: url as NSURL)
+    }
+}
+
+private struct MemoryMediaPlaceholder: View {
+    let mediaKind: ParkMemory.MediaKind
+    let hasMediaReference: Bool
+
+    var body: some View {
+        Rectangle()
+            .fill(.blue.opacity(0.12))
+            .overlay {
+                VStack(spacing: 8) {
+                    Image(systemName: mediaKind == .photo ? "photo" : "video")
+                        .font(.system(size: 34))
+                        .foregroundStyle(.blue)
+
+                    if hasMediaReference {
+                        Text("Photo unavailable")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
     }
 }
 

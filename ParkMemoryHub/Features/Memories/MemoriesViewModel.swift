@@ -15,6 +15,7 @@ final class MemoriesViewModel: ObservableObject {
     private let familyRepository: any FamilyRepository
     private let activeGroup: GroupSpace
     private let circleSync: any CircleSyncing
+    private var hasLoaded = false
 
     init(
         repository: any MemoryRepository,
@@ -29,7 +30,10 @@ final class MemoriesViewModel: ObservableObject {
     }
 
     func loadMemories() {
-        isLoading = true
+        guard !isLoading else { return }
+
+        let shouldShowFullScreenLoading = !hasLoaded && memories.isEmpty
+        isLoading = shouldShowFullScreenLoading
         errorMessage = nil
 
         Task {
@@ -42,12 +46,14 @@ final class MemoriesViewModel: ObservableObject {
                 currentMember = try await loadedCurrentMember
                 creatorNamesByID = Dictionary(uniqueKeysWithValues: members.map { ($0.id, $0.displayName) })
                 memories = try await loadedMemories
+                hasLoaded = true
+                isLoading = false
+
                 try await refreshFromICloud(showStatus: false)
             } catch {
                 errorMessage = error.localizedDescription
+                isLoading = false
             }
-
-            isLoading = false
         }
     }
 

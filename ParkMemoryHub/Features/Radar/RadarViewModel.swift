@@ -10,6 +10,7 @@ final class RadarViewModel: ObservableObject {
 
     private let familyRepository: any FamilyRepository
     private let circleSync: any CircleSyncing
+    private var hasLoaded = false
     let activeGroup: GroupSpace
 
     init(
@@ -23,20 +24,26 @@ final class RadarViewModel: ObservableObject {
     }
 
     func loadMembers() {
-        isLoading = true
+        guard !isLoading else { return }
+
+        let shouldShowFullScreenLoading = !hasLoaded && members.isEmpty
+        isLoading = shouldShowFullScreenLoading
         errorMessage = nil
 
         Task {
             do {
                 let member = try await familyRepository.currentMember()
                 currentMember = member
+                members = try await familyRepository.listMembers()
+                hasLoaded = true
+                isLoading = false
+
                 _ = try await circleSync.refresh()
                 members = try await familyRepository.listMembers()
             } catch {
                 errorMessage = CircleSyncErrorFormatter.message(for: error)
+                isLoading = false
             }
-
-            isLoading = false
         }
     }
 

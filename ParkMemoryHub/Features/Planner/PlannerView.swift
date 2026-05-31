@@ -51,6 +51,7 @@ struct PlannerView: View {
                             memberCount: viewModel.members.count
                         )
                         .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
 
                         ForEach(viewModel.activities) { activity in
                             Button {
@@ -67,6 +68,8 @@ struct PlannerView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                             .swipeActions {
                                 Button(role: .destructive) {
                                     viewModel.deleteActivity(activity)
@@ -77,8 +80,12 @@ struct PlannerView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .contentMargins(.bottom, 24, for: .scrollContent)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .appScreenBackground(.chrome)
             .navigationTitle("Planner")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -183,14 +190,15 @@ private struct PlannerSummary: View {
     let memberCount: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Lumina.Space.sm) {
             Text("Group plans")
-                .font(.title3.weight(.semibold))
+                .font(Lumina.Typo.display(26, weight: .semibold))
+                .foregroundStyle(Lumina.Color.textPrimary)
 
-            HStack(spacing: 10) {
-                PlannerMetric(title: "Plans", value: "\(activities.count)", systemImage: "calendar", tint: .blue)
-                PlannerMetric(title: "Confirmed", value: "\(confirmedCount)", systemImage: "checkmark.seal.fill", tint: .green)
-                PlannerMetric(title: "Members", value: "\(memberCount)", systemImage: "person.3.fill", tint: .purple)
+            HStack(spacing: Lumina.Space.sm) {
+                PlannerMetric(title: "Plans", value: "\(activities.count)", systemImage: "calendar", tint: Lumina.Status.info)
+                PlannerMetric(title: "Confirmed", value: "\(confirmedCount)", systemImage: "checkmark.seal.fill", tint: Lumina.Status.success)
+                PlannerMetric(title: "Members", value: "\(memberCount)", systemImage: "person.3.fill", tint: Lumina.Status.highlight)
             }
 
             if let nextPlan {
@@ -223,21 +231,24 @@ private struct PlannerMetric: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Lumina.Space.xs) {
             Image(systemName: systemImage)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.14), in: Circle())
 
             Text(value)
-                .font(.headline)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(Lumina.Color.textPrimary)
 
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Lumina.Color.textSubtle)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(tint.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+        .padding(Lumina.Space.sm)
+        .background(Lumina.Color.overlay, in: RoundedRectangle(cornerRadius: Lumina.Radius.md, style: .continuous))
     }
 }
 
@@ -267,6 +278,8 @@ private struct PlannerEmptyState: View {
             }
             .buttonStyle(.borderedProminent)
         }
+        .padding(24)
+        .appReadableSurface(cornerRadius: 18)
         .padding(24)
     }
 }
@@ -329,11 +342,11 @@ private struct ActivityRow: View {
 
             HStack(spacing: 6) {
                 Label("\(activity.yesVoteCount) of \(memberCount) yes", systemImage: "person.2.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Lumina.Status.success)
 
                 if activity.votesByMemberID.isEmpty {
                     Text("No votes yet")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Lumina.Color.textSubtle)
                 }
             }
             .font(.caption)
@@ -350,27 +363,19 @@ private struct ActivityRow: View {
                         .font(.caption.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 7)
-                        .foregroundStyle(isSelected(vote) ? .white : vote.color)
-                        .background(isSelected(vote) ? vote.color : vote.color.opacity(0.1), in: Capsule())
+                        .foregroundStyle(isSelected(vote) ? Lumina.Color.onAccent : vote.color)
+                        .background(isSelected(vote) ? vote.color : vote.color.opacity(0.14), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(Lumina.Space.md)
+        .appGlassBlock(cornerRadius: 16)
     }
 
     private var statusColor: Color {
-        switch activity.status {
-        case .planned:
-            return .blue
-        case .confirmed:
-            return .green
-        case .completed:
-            return .purple
-        case .cancelled:
-            return .red
-        }
+        activity.status.color
     }
 
     private func count(for vote: ParkActivity.Vote) -> Int {
@@ -777,8 +782,8 @@ private struct ActivityDetailView: View {
                                     .font(.caption.weight(.semibold))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 9)
-                                    .foregroundStyle(isCurrentVote(vote) ? .white : vote.color)
-                                    .background(isCurrentVote(vote) ? vote.color : vote.color.opacity(0.1), in: Capsule())
+                                    .foregroundStyle(isCurrentVote(vote) ? Lumina.Color.onAccent : vote.color)
+                                    .background(isCurrentVote(vote) ? vote.color : vote.color.opacity(0.14), in: Capsule())
                             }
                             .buttonStyle(.plain)
                         }
@@ -871,13 +876,13 @@ private extension ParkActivity.Status {
     var color: Color {
         switch self {
         case .planned:
-            return .blue
+            return Lumina.Status.pending
         case .confirmed:
-            return .green
+            return Lumina.Status.success
         case .completed:
-            return .purple
+            return Lumina.Status.neutral
         case .cancelled:
-            return .red
+            return Lumina.Status.danger
         }
     }
 }
@@ -897,11 +902,11 @@ private extension ParkActivity.Vote {
     var color: Color {
         switch self {
         case .yes:
-            return .green
+            return Lumina.Status.success
         case .maybe:
-            return .orange
+            return Lumina.Status.warning
         case .no:
-            return .red
+            return Lumina.Status.danger
         }
     }
 }
